@@ -2,14 +2,16 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie'; // Importa a biblioteca js-cookie
+import Cookies from 'js-cookie';
+import { toast } from 'sonner';
 
 interface AuthContextProps {
     isAuthenticated: boolean;
     loading: boolean;
-    login: (token: string, email: string) => void; // login agora recebe o email
+    login: (token: string, email: string, userType: string) => void;
     logout: () => void;
     userEmail: string | null;
+    userType: string | null;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -29,16 +31,20 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [userEmail, setUserEmail] = useState<string | null>(null); // Estado para o email
+    const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [userType, setUserType] = useState<string | null>(null);
     const router = useRouter();
 
-    // --- useEffect (modificado) ---
+    // Effect to check auth status on mount
     useEffect(() => {
-        const token = Cookies.get('accessToken'); // Lê do cookie
-        const storedEmail = localStorage.getItem("userEmail") //Pega email
+        const token = Cookies.get('accessToken');
+        const storedEmail = localStorage.getItem("userEmail");
+        const storedUserType = localStorage.getItem("userType");
+        
         if (token) {
             setIsAuthenticated(true);
             setUserEmail(storedEmail);
+            setUserType(storedUserType);
         }
         setLoading(false);
 
@@ -47,36 +53,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
     }, [router]);
 
-
-    // --- Funções login e logout (modificadas) ---
-    const login = (token: string, email:string) => {
+    const login = (token: string, email: string, type: string) => {
         Cookies.set('accessToken', token, {
-           secure: process.env.NODE_ENV === 'production', // Use true em produção (HTTPS)
-           sameSite: 'lax', // Ou 'strict'
-        //    expires: settings.ACCESS_TOKEN_EXPIRE_MINUTES / (60 * 24), //Converte min em dias.  Removido, pois vamos usar o tempo de expiração do token JWT diretamente.
-         }); // Define o cookie
-        localStorage.setItem("userEmail", email); //Salva o email *temporariamente*
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+        });
+        localStorage.setItem("userEmail", email);
+        localStorage.setItem("userType", type);
         setIsAuthenticated(true);
         setUserEmail(email);
+        setUserType(type);
         router.push('/');
     };
 
     const logout = () => {
-        Cookies.remove('accessToken'); // Remove o cookie
-        localStorage.removeItem("userEmail") // Remove o email *temporariamente*
+        Cookies.remove('accessToken');
+        localStorage.removeItem("userEmail");
+        localStorage.removeItem("userType");
         setIsAuthenticated(false);
         setUserEmail(null);
+        setUserType(null);
+        toast.info("Logout realizado com sucesso");
         router.push('/auth/sign-in');
     };
-
 
     const value = {
         isAuthenticated,
         loading,
         login,
         logout,
-        userEmail
+        userEmail,
+        userType
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+
+    }

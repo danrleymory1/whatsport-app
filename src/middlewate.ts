@@ -6,20 +6,42 @@ export function middleware(request: NextRequest) {
     const path = request.nextUrl.pathname;
 
     // Rotas públicas (não precisam de autenticação)
-    const publicPaths = ['/auth/sign-in', '/auth/sign-up', '/auth/forgot-password', '/auth/reset-password'];
+    const publicPaths = [
+      '/auth/sign-in', 
+      '/auth/sign-up', 
+      '/auth/forgot-password', 
+      '/auth/reset-password'
+    ];
+    
+    // Verifica se é uma rota de recursos estáticos
+    const isStaticAsset = path.startsWith('/_next') || 
+                          path.startsWith('/api') || 
+                          path.startsWith('/images') || 
+                          path.includes('favicon.ico');
 
-    // Verifica se o caminho atual é público
-    if (publicPaths.includes(path)) {
+    // Se for uma rota pública ou de recurso estático, permite o acesso
+    if (publicPaths.includes(path) || isStaticAsset) {
         return NextResponse.next();
     }
 
-    // Obtém o token do cookie (Mude para o nome do seu cookie!)
-    const token = request.cookies.get('accessToken')?.value; //Mude o nome do cookie aqui
-
+    // Obtém o token do cookie
+    const token = request.cookies.get('accessToken')?.value;
 
     // Se não houver token, redireciona para o login
     if (!token) {
-        return NextResponse.redirect(new URL('/auth/sign-in', request.url));
+        const loginUrl = new URL('/auth/sign-in', request.url);
+        
+        // Se houver um redirecionamento forçado da página original, adicione ao URL
+        if (!publicPaths.includes(path)) {
+            loginUrl.searchParams.set('callbackUrl', path);
+        }
+        
+        return NextResponse.redirect(loginUrl);
+    }
+
+    // Verifica se está tentando acessar uma página de autenticação enquanto já está logado
+    if (path.startsWith('/auth/') && token) {
+        return NextResponse.redirect(new URL('/', request.url));
     }
 
     // Se chegou aqui, o usuário está autenticado, continua
@@ -36,6 +58,6 @@ export const config = {
         * - _next/image (image optimization files)
         * - favicon.ico (favicon file)
         */
-       '/((?!api|_next/static|_next/image|favicon.ico).*)',
+       '/((?!_next/static|_next/image|favicon.ico).*)',
     ],
 };

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -33,11 +34,9 @@ type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 export function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token"); // Obtém o token da URL
+  const token = searchParams.get("token");
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   const form = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordSchema),
@@ -49,27 +48,26 @@ export function ResetPasswordForm() {
 
   async function onSubmit(data: ResetPasswordFormData) {
     setLoading(true);
-    setError(null);
-    setSuccess(false);
 
     if (!token) {
-      setError("Token de redefinição inválido.");
+      toast.error("Token inválido", {
+        description: "O token de redefinição de senha é inválido ou expirou.",
+      });
       setLoading(false);
       return;
     }
 
     try {
       const response = await fetch(`http://localhost:8000/auth/reset-password?token=${token}`, {
-          method: "POST",
-          headers:{
-              "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-              password: data.password,
-              confirmPassword: data.confirmPassword
-          })
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          password: data.password,
+          confirm_password: data.confirmPassword,
+        }),
       });
-
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -78,11 +76,23 @@ export function ResetPasswordForm() {
 
       const responseData = await response.json();
       console.log("Redefinição bem-sucedida:", responseData);
-      setSuccess(true);
-      // router.push('/auth/sign-in');  // Redirecionar para o login
+      
+      toast.success("Senha redefinida com sucesso", {
+        description: "Você já pode fazer login com sua nova senha.",
+        action: {
+          label: "Fazer Login",
+          onClick: () => router.push("/auth/sign-in"),
+        },
+      });
+      
+      setTimeout(() => {
+        router.push('/auth/sign-in');
+      }, 2000);
 
     } catch (err: any) {
-      setError(err.message || "Erro ao redefinir a senha.");
+      toast.error("Falha na redefinição", {
+        description: err.message || "Erro ao redefinir a senha.",
+      });
       console.error("Erro na redefinição:", err);
     } finally {
       setLoading(false);
@@ -93,6 +103,12 @@ export function ResetPasswordForm() {
     return (
       <div className="text-center">
         <p className="text-red-500">Token de redefinição inválido.</p>
+        <Button
+          className="mt-4"
+          onClick={() => router.push('/auth/forgot-password')}
+        >
+          Solicitar nova redefinição
+        </Button>
       </div>
     );
   }
@@ -129,12 +145,6 @@ export function ResetPasswordForm() {
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Redefinindo..." : "Redefinir Senha"}
         </Button>
-        {error && <p className="text-red-500 text-sm">{error}</p>}
-        {success && (
-          <p className="text-green-500 text-sm">
-            Senha redefinida com sucesso!
-          </p>
-        )}
       </form>
     </Form>
   );

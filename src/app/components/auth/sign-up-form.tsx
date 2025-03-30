@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/app/context/auth-context";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useRouter } from "next/navigation";
 
 // Schema de validação com Zod
 const signUpSchema = z.object({
@@ -39,9 +40,8 @@ type SignUpFormData = z.infer<typeof signUpSchema>;
 
 export function SignUpForm() {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAuth(); //Verifica se está logado
-  const router = useRouter(); // Inicializa o router
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
 
   const form = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
@@ -52,16 +52,14 @@ export function SignUpForm() {
     },
   });
 
-    useEffect(()=>{
-        if(isAuthenticated){
-            router.push("/")
-        }
-    }, [isAuthenticated, router])
-
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/");
+    }
+  }, [isAuthenticated, router]);
 
   async function onSubmit(data: SignUpFormData) {
     setLoading(true);
-    setError(null);
 
     try {
       const response = await fetch("http://localhost:8000/auth/sign-up", {
@@ -70,9 +68,9 @@ export function SignUpForm() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            email: data.email,
-            password: data.password,
-            user_type: data.userType
+          email: data.email,
+          password: data.password,
+          user_type: data.userType,
         }),
       });
 
@@ -83,11 +81,21 @@ export function SignUpForm() {
 
       const responseData = await response.json();
       console.log("Cadastro bem-sucedido:", responseData);
-      router.push("/auth/sign-in"); // Redireciona para o login após o cadastro
-      // Adicione aqui o redirecionamento ou atualização do estado de autenticação
+      
+      toast.success("Cadastro realizado com sucesso", {
+        description: "Você já pode fazer login na sua conta.",
+        action: {
+          label: "Fazer Login",
+          onClick: () => router.push("/auth/sign-in"),
+        },
+      });
+      
+      router.push("/auth/sign-in");
 
     } catch (err: any) {
-      setError(err.message || "Erro ao cadastrar. Tente novamente.");
+      toast.error("Erro no cadastro", {
+        description: err.message || "Erro ao cadastrar. Tente novamente.",
+      });
       console.error("Erro no cadastro:", err);
     } finally {
       setLoading(false);
@@ -95,80 +103,78 @@ export function SignUpForm() {
   }
 
   return (
-      <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>E-mail</FormLabel>
-                          <FormControl>
-                              <Input placeholder="seu@email.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )}
-              />
-              <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Senha</FormLabel>
-                          <FormControl>
-                              <Input type="password" placeholder="********" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )}
-              />
-              <FormField
-                  control={form.control}
-                  name="userType"
-                  render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Tipo de Usuário</FormLabel>
-                          <FormControl>
-                              <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                      <Button variant="outline" className="w-full">
-                                          {field.value === "jogador" ? "Jogador" : "Gerente"}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>E-mail</FormLabel>
+              <FormControl>
+                <Input placeholder="seu@email.com" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Senha</FormLabel>
+              <FormControl>
+                <Input type="password" placeholder="********" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="userType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tipo de Usuário</FormLabel>
+              <FormControl>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full">
+                      {field.value === "jogador" ? "Jogador" : "Gerente"}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem
+                      onSelect={() => field.onChange("jogador")}
+                      className={field.value === "jogador" ? "font-bold" : ""}
+                    >
+                      Jogador
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => field.onChange("gerente")}
+                      className={field.value === "gerente" ? "font-bold" : ""}
+                    >
+                      Gerente
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Cadastrando..." : "Cadastrar"}
+        </Button>
 
-                                      </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="start">
-                                      <DropdownMenuItem
-                                          onSelect={() => field.onChange("jogador")}
-                                          className={field.value === "jogador" ? "font-bold" : ""}
-                                      >
-                                          Jogador
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                          onSelect={() => field.onChange("gerente")}
-                                          className={field.value === "gerente" ? "font-bold" : ""}
-                                      >
-                                          Gerente
-                                      </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                              </DropdownMenu>
-                          </FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )}
-              />
-              <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Cadastrando..." : "Cadastrar"}
-              </Button>
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-
-              <div className="text-sm text-center">
-                  Já tem uma conta?{" "}
-                  <Link href="/auth/sign-in" className="text-blue-500 hover:underline">
-                      Faça login
-                  </Link>
-              </div>
-          </form>
-      </Form>
+        <div className="text-sm text-center">
+          Já tem uma conta?{" "}
+          <Link href="/auth/sign-in" className="text-blue-500 hover:underline">
+            Faça login
+          </Link>
+        </div>
+      </form>
+    </Form>
   );
 }
