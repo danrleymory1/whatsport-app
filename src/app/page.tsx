@@ -4,8 +4,8 @@ import { useAuth } from "./context/auth-context";
 import { redirect } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { toast } from "sonner";
-import { PlayerDashboard } from "./components/player/dashboard";
-import { ManagerDashboard } from "./components/manager/dashboard";
+import PlayerDashboard from "./components/player/dashboard";
+import ManagerDashboard from "./components/manager/dashboard";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function Home() {

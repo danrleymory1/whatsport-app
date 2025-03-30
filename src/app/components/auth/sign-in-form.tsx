@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -17,6 +16,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/app/context/auth-context";
+import { useRouter, useSearchParams } from "next/navigation";
+import { apiService } from "@/services/api-service";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle } from "lucide-react";
 
 const signInSchema = z.object({
   email: z.string().email({ message: "Insira um e-mail válido." }),
@@ -27,8 +30,12 @@ type SignInFormData = z.infer<typeof signInSchema>;
 
 export function SignInForm() {
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
-
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const { login, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const form = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -37,40 +44,37 @@ export function SignInForm() {
     },
   });
 
+  // Check for registration success message
+  useEffect(() => {
+    if (searchParams.get('registered') === 'true') {
+      setSuccessMessage('Cadastro realizado com sucesso! Faça login para continuar.');
+    }
+    if (searchParams.get('reset') === 'true') {
+      setSuccessMessage('Senha redefinida com sucesso! Faça login com sua nova senha.');
+    }
+  }, [searchParams]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/');
+    }
+  }, [isAuthenticated, router]);
+
   async function onSubmit(data: SignInFormData) {
     setLoading(true);
+    setError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/auth/sign-in", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          username: data.email,
-          password: data.password,
-        }),
+      const response = await apiService.login({
+        username: data.email,
+        password: data.password,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Erro ao fazer login.");
-      }
-
-      const responseData = await response.json();
-      console.log("Login bem-sucedido:", responseData);
-
-      // Use a função login do contexto
-      login(responseData.access_token, data.email, responseData.user_type || 'user');
-      
-      toast.success("Login bem-sucedido", {
-        description: "Bem-vindo ao WhatsPort!",
-      });
-
+      console.log("Login bem-sucedido:", response);
+      login(response.data.access_token, data.email);
     } catch (err: any) {
-      toast.error("Falha no login", {
-        description: err.message || "Erro ao fazer login. Verifique suas credenciais.",
-      });
+      setError(err.message || "Erro ao fazer login. Verifique suas credenciais.");
       console.error("Erro de login", err);
     } finally {
       setLoading(false);
@@ -78,55 +82,66 @@ export function SignInForm() {
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>E-mail</FormLabel>
-              <FormControl>
-                <Input placeholder="seu@email.com" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Senha</FormLabel>
-              <FormControl>
-                <Input type="password" placeholder="********" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+    <>
+      {successMessage && (
+        <Alert className="mb-6 bg-green-50 text-green-700 border-green-200">
+          <CheckCircle className="h-4 w-4 mr-2" />
+          <AlertDescription>{successMessage}</AlertDescription>
+        </Alert>
+      )}
+      
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>E-mail</FormLabel>
+                <FormControl>
+                  <Input placeholder="seu@email.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Senha</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="********" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        <div className="text-right">
-          <Link
-            href="/auth/forgot-password"
-            className="text-blue-500 hover:underline text-sm"
-          >
-            Esqueceu a senha?
-          </Link>
-        </div>
+          <div className="text-right">
+            <Link
+              href="/auth/forgot-password"
+              className="text-blue-500 hover:underline text-sm"
+            >
+              Esqueceu a senha?
+            </Link>
+          </div>
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Entrando..." : "Entrar"}
-        </Button>
-        
-        <div className="text-sm text-center">
-          Não tem uma conta?{" "}
-          <Link href="/auth/sign-up" className="text-blue-500 hover:underline">
-            Cadastre-se
-          </Link>
-        </div>
-      </form>
-    </Form>
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Entrando..." : "Entrar"}
+          </Button>
+          
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          
+          <div className="text-sm text-center">
+            Não tem uma conta?{" "}
+            <Link href="/auth/sign-up" className="text-blue-500 hover:underline">
+              Cadastre-se
+            </Link>
+          </div>
+        </form>
+      </Form>
+    </>
   );
 }

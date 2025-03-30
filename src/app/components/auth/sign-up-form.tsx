@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,22 +23,29 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/app/context/auth-context";
 import { useRouter } from "next/navigation";
+import { UserType } from "@/types/user";
+import { apiService } from "@/services/api-service";
 
-// Schema de validação com Zod
+// Schema for validation with Zod
 const signUpSchema = z.object({
   email: z.string().email({ message: "Por favor, insira um e-mail válido." }),
   password: z
     .string()
     .min(8, { message: "A senha deve ter pelo menos 8 caracteres." }),
+  confirmPassword: z.string(),
   userType: z.enum(["jogador", "gerente"], {
     errorMap: () => ({ message: "Selecione um tipo de usuário." }),
   }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "As senhas não coincidem",
+  path: ["confirmPassword"],
 });
 
 type SignUpFormData = z.infer<typeof signUpSchema>;
 
 export function SignUpForm() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { isAuthenticated } = useAuth();
   const router = useRouter();
 
@@ -48,54 +54,32 @@ export function SignUpForm() {
     defaultValues: {
       email: "",
       password: "",
+      confirmPassword: "",
       userType: "jogador",
     },
   });
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push("/");
-    }
-  }, [isAuthenticated, router]);
+  // Redirect if already logged in
+  if (isAuthenticated) {
+    router.push("/");
+    return null;
+  }
 
   async function onSubmit(data: SignUpFormData) {
     setLoading(true);
+    setError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/auth/sign-up", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          user_type: data.userType,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Erro ao cadastrar.");
-      }
-
-      const responseData = await response.json();
-      console.log("Cadastro bem-sucedido:", responseData);
-      
-      toast.success("Cadastro realizado com sucesso", {
-        description: "Você já pode fazer login na sua conta.",
-        action: {
-          label: "Fazer Login",
-          onClick: () => router.push("/auth/sign-in"),
-        },
+      const response = await apiService.register({
+        email: data.email,
+        password: data.password,
+        user_type: data.userType
       });
       
-      router.push("/auth/sign-in");
-
+      console.log("Cadastro bem-sucedido:", response);
+      router.push("/auth/sign-in?registered=true");
     } catch (err: any) {
-      toast.error("Erro no cadastro", {
-        description: err.message || "Erro ao cadastrar. Tente novamente.",
-      });
+      setError(err.message || "Erro ao cadastrar. Tente novamente.");
       console.error("Erro no cadastro:", err);
     } finally {
       setLoading(false);
@@ -124,6 +108,19 @@ export function SignUpForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Senha</FormLabel>
+              <FormControl>
+                <Input type="password" placeholder="********" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Confirmar Senha</FormLabel>
               <FormControl>
                 <Input type="password" placeholder="********" {...field} />
               </FormControl>
@@ -167,6 +164,7 @@ export function SignUpForm() {
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Cadastrando..." : "Cadastrar"}
         </Button>
+        {error && <p className="text-red-500 text-sm">{error}</p>}
 
         <div className="text-sm text-center">
           Já tem uma conta?{" "}
