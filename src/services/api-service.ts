@@ -62,20 +62,25 @@ class ApiService {
       }
     }
     
-    const response = await fetch(url, {
-      method,
-      headers,
-      body,
-      credentials: 'include' // Inclui cookies nas requisições cross-origin
-    });
-    
-    const responseData = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(responseData.detail || responseData.message || 'Ocorreu um erro na requisição');
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body,
+        credentials: 'include' // Inclui cookies nas requisições cross-origin
+      });
+      
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(responseData.detail || responseData.message || 'Ocorreu um erro na requisição');
+      }
+      
+      return responseData;
+    } catch (error: any) {
+      console.error(`API Error (${method} ${endpoint}):`, error);
+      throw error;
     }
-    
-    return responseData;
   }
   
   // Métodos de autenticação
@@ -85,7 +90,7 @@ class ApiService {
   
   async login(data: LoginPayload): Promise<ApiResponse<{ access_token: string, token_type: string }>> {
     return this.request('/auth/sign-in', 'POST', data, true);
-  }
+}
   
   async forgotPassword(data: ForgotPasswordPayload): Promise<ApiResponse<any>> {
     return this.request('/auth/forgot-password', 'POST', data);

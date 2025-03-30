@@ -64,15 +64,22 @@ export function SignInForm() {
   async function onSubmit(data: SignInFormData) {
     setLoading(true);
     setError(null);
-
+  
     try {
       const response = await apiService.login({
         username: data.email,
         password: data.password,
       });
-
+  
       console.log("Login bem-sucedido:", response);
-      login(response.data.access_token, data.email);
+      
+      // Verificar se response.data existe antes de acessar
+      if (response.data && response.data.access_token) {
+        login(response.data.access_token, data.email);
+      } else {
+        throw new Error("Resposta da API inválida");
+      }
+      
     } catch (err: any) {
       setError(err.message || "Erro ao fazer login. Verifique suas credenciais.");
       console.error("Erro de login", err);

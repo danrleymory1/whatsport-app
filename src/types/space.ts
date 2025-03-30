@@ -10,12 +10,21 @@ export interface SpacePhoto {
     price_per_hour?: number;
     max_participants?: number;
   }
+
+  export interface SpaceLocation {
+    lat: number;
+    lng: number;
+    address: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+  }
   
   export interface Space {
     id: string;
     name: string;
     description: string;
-    location: Location;
+    location: SpaceLocation;
     photos: SpacePhoto[];
     available_sports: SpaceSport[];
     amenities: string[];

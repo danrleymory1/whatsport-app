@@ -1,10 +1,11 @@
+// src/app/components/player/events/page.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { useForm, Controller } from "react-hook-form"; // Adicione Controller
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Form,
   FormControl,
@@ -48,7 +49,21 @@ import TomTomMap from "@/components/map/tomtom-map";
 import { mapService } from "@/services/map-service";
 import { apiService } from "@/services/api-service";
 
-// Schema for event creation
+// Schema para tipos Location 
+const LocationSchema = z.object({
+  address: z.string().min(1, "Endereço é obrigatório."),
+  lat: z.number(),
+  lng: z.number(),
+});
+
+// Schema for position
+const PositionSchema = z.object({
+  name: z.string().min(1, "Nome da posição é obrigatório."),
+  description: z.string().optional(),
+  quantity: z.number().min(1, "Mínimo de 1 vaga."),
+});
+
+// Schema para criação de eventos
 const createEventSchema = z.object({
   title: z.string().min(3, "O título deve ter pelo menos 3 caracteres."),
   description: z.string().min(10, "A descrição deve ter pelo menos 10 caracteres."),
@@ -61,18 +76,8 @@ const createEventSchema = z.object({
   max_participants: z.number().min(2, "Mínimo de 2 participantes."),
   price_per_person: z.number().optional(),
   is_private: z.boolean().default(false),
-  location: z.object({
-    address: z.string().min(1, "Endereço é obrigatório."),
-    lat: z.number(),
-    lng: z.number(),
-  }),
-  positions: z.array(
-    z.object({
-      name: z.string().min(1, "Nome da posição é obrigatório."),
-      description: z.string().optional(),
-      quantity: z.number().min(1, "Mínimo de 1 vaga."),
-    })
-  ).optional(),
+  location: LocationSchema,
+  positions: z.array(PositionSchema).optional(),
 }).refine(data => {
   const startDateTime = new Date(`${format(data.start_date, 'yyyy-MM-dd')}T${data.start_time}`);
   const endDateTime = new Date(`${format(data.end_date, 'yyyy-MM-dd')}T${data.end_time}`);
@@ -82,9 +87,10 @@ const createEventSchema = z.object({
   path: ["end_date"],
 });
 
+// Definir tipo com base no schema
 type CreateEventFormData = z.infer<typeof createEventSchema>;
 
-// List of sports
+// Lista de esportes
 const sports = [
   "Futebol", 
   "Vôlei", 
@@ -100,7 +106,7 @@ const sports = [
   "Outro"
 ];
 
-// Skill levels
+// Níveis de habilidade
 const skillLevels = [
   "Iniciante",
   "Intermediário",
@@ -116,6 +122,7 @@ export default function CreateEventPage() {
   const [positions, setPositions] = useState<{ name: string; description: string; quantity: number }[]>([]);
   const [submitting, setSubmitting] = useState(false);
   
+  // Importante: especifique CreateEventFormData como tipo genérico para o useForm
   const form = useForm<CreateEventFormData>({
     resolver: zodResolver(createEventSchema),
     defaultValues: {
@@ -126,16 +133,16 @@ export default function CreateEventPage() {
       max_participants: 10,
       price_per_person: 0,
       is_private: false,
-      position: [],
       location: {
         address: "",
         lat: 0,
         lng: 0,
       },
+      positions: [],
     },
   });
   
-  // Search address using TomTom API
+  // Pesquisar endereço usando a API TomTom
   const handleAddressSearch = async () => {
     if (!searchAddress.trim()) return;
     
@@ -150,26 +157,33 @@ export default function CreateEventPage() {
     }
   };
   
-  // Select address from search results
+  // Selecionar endereço dos resultados da pesquisa
   const selectAddress = (result: any) => {
     const location = mapService.toLocation(result);
-    form.setValue("location", location);
+    form.setValue("location", {
+      address: location.address || '',
+      lat: location.lat,
+      lng: location.lng
+    });
     setSearchResults([]);
   };
   
-  // Add a position
+  // Adicionar uma posição
   const addPosition = () => {
-    setPositions([...positions, { name: "", description: "", quantity: 1 }]);
+    const newPositions = [...positions, { name: "", description: "", quantity: 1 }];
+    setPositions(newPositions);
+    form.setValue("positions", newPositions);
   };
   
-  // Remove a position
+  // Remover uma posição
   const removePosition = (index: number) => {
     const newPositions = [...positions];
     newPositions.splice(index, 1);
     setPositions(newPositions);
+    form.setValue("positions", newPositions);
   };
   
-  // Update position
+  // Atualizar posição
   const updatePosition = (index: number, field: string, value: any) => {
     const newPositions = [...positions];
     (newPositions[index] as any)[field] = value;
@@ -177,16 +191,16 @@ export default function CreateEventPage() {
     form.setValue("positions", newPositions);
   };
   
-  // Form submission
+  // Submissão do formulário
   const onSubmit = async (data: CreateEventFormData) => {
     setSubmitting(true);
     
     try {
-      // Format dates
+      // Formatar datas
       const startDateTime = new Date(`${format(data.start_date, 'yyyy-MM-dd')}T${data.start_time}`);
       const endDateTime = new Date(`${format(data.end_date, 'yyyy-MM-dd')}T${data.end_time}`);
       
-      // Prepare data for API
+      // Preparar dados para a API
       const eventData = {
         ...data,
         start_time: startDateTime.toISOString(),
@@ -194,10 +208,10 @@ export default function CreateEventPage() {
         positions: positions.length > 0 ? positions : undefined,
       };
       
-      // Create event
+      // Criar evento
       const response = await apiService.createEvent(eventData);
       
-      // Redirect to event page
+      // Redirecionar para a página do evento
       router.push(`/player/events/${response.data.id}`);
     } catch (error) {
       console.error("Error creating event:", error);
@@ -575,12 +589,24 @@ export default function CreateEventPage() {
                     events={[{
                       id: "new-event",
                       title: form.watch("title") || "Novo Evento",
+                      description: form.watch("description") || "Descrição do evento",
                       location: {
                         lat: form.watch("location.lat"),
                         lng: form.watch("location.lng"),
                         address: form.watch("location.address"),
-                      }
-                    } as any]}
+                      },
+                      sport_type: form.watch("sport_type") || "",
+                      skill_level: form.watch("skill_level") || "",
+                      start_time: new Date().toISOString(),
+                      end_time: new Date().toISOString(),
+                      max_participants: form.watch("max_participants"),
+                      participants: [],
+                      organizer_id: "",
+                      organizer_name: "",
+                      is_private: form.watch("is_private"),
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString()
+                    }]}
                   />
                 ) : (
                   <div className="h-full flex items-center justify-center bg-muted">

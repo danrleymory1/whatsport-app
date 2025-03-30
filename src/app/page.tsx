@@ -1,3 +1,4 @@
+// src/app/page.tsx
 "use client";
 
 import { useAuth } from "./context/auth-context";
@@ -40,9 +41,9 @@ export default function Home() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><LoadingSpinner /></div>}>
       {userType === 'gerente' ? (
-        <ManagerDashboard userEmail={userEmail} />
+        <ManagerDashboard />
       ) : (
-        <PlayerDashboard userEmail={userEmail} />
+        <PlayerDashboard />
       )}
     </Suspense>
   );

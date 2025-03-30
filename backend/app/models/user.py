@@ -1,6 +1,11 @@
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
+from enum import Enum
 from bson import ObjectId
+
+class UserType(str, Enum):
+    PLAYER = "jogador"
+    MANAGER = "gerente"
 
 class PyObjectId(ObjectId):
     @classmethod

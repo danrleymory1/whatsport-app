@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Response
-from fastapi.security import OAuth2PasswordRequestForm  # Importante para o login
+from fastapi.security import OAuth2PasswordRequestForm 
 from typing import Annotated
 from datetime import timedelta
 
@@ -32,7 +32,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # --- Rotas ---
 
-"""@router.post("/sign-up", response_model=Message, status_code=status.HTTP_201_CREATED)
+    
+@router.post("/sign-up", response_model=Message, status_code=status.HTTP_201_CREATED)
 async def sign_up(
     user: UserCreate, db: AsyncIOMotorDatabase = Depends(get_database)
 ):
@@ -53,35 +54,9 @@ async def sign_up(
     )
 
     # Insere no banco de dados
-    inserted_user = await db.users.insert_one(new_user.model_dump(by_alias=True, exclude={"id"})) # by_alias para usar "_id", exclude para não duplicar o ID
+    inserted_user = await db.users.insert_one(new_user.model_dump(by_alias=True, exclude={"id"}))
 
-    return {"message": "Usuário cadastrado com sucesso!"}"""
-    
-@router.post("/sign-up", response_model=Message, status_code=status.HTTP_201_CREATED)
-async def sign_up(
-    user: UserCreate, db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    # # Verifica se o usuário já existe
-    # existing_user = await db.users.find_one({"email": user.email})
-    # if existing_user:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_400_BAD_REQUEST,
-    #         detail="Email já cadastrado.",
-    #     )
-
-    # # Hash da senha
-    # hashed_password = get_password_hash(user.password)
-
-    # # Cria o novo usuário
-    # new_user = User(
-    #     email=user.email, hashed_password=hashed_password, user_type=user.user_type
-    # )
-
-    # # Insere no banco de dados
-    # inserted_user = await db.users.insert_one(new_user.model_dump(by_alias=True, exclude={"id"}))
-
-    return {"message": "Usuário cadastrado com sucesso!"} # Retorna sucesso diretamente
-
+    return {"message": "Usuário cadastrado com sucesso!"}
 
 
 @router.post("/sign-in", response_model=Token)

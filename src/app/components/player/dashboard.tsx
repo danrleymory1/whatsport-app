@@ -28,7 +28,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function PlayerDashboard() {
-  const { user } = useAuth();
+  const { user, userEmail } = useAuth();
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);

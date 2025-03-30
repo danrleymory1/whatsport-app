@@ -31,12 +31,61 @@ interface GeocodingOptions {
 class MapService {
   private readonly apiKey: string;
   private readonly baseUrl: string = 'https://api.tomtom.com';
+  private mapScriptsLoaded: boolean = false;
   
   constructor() {
     this.apiKey = process.env.NEXT_PUBLIC_TOMTOM_KEY || '';
     if (!this.apiKey) {
       console.warn('TomTom API key not found. Map functionality will be limited.');
     }
+  }
+  
+  // Load TomTom SDK scripts if they aren't already loaded
+  async loadMapScripts(): Promise<void> {
+    if (typeof window === 'undefined') return;
+    
+    // Check if TomTom is already loaded
+    if (window.tomtom || this.mapScriptsLoaded) return;
+    
+    // Load CSS
+    const mapsCss = document.createElement('link');
+    mapsCss.rel = 'stylesheet';
+    mapsCss.href = 'https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps.css';
+    document.head.appendChild(mapsCss);
+    
+    // Load JS
+    const mapsJs = document.createElement('script');
+    mapsJs.src = 'https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps-web.min.js';
+    mapsJs.async = true;
+    document.body.appendChild(mapsJs);
+    
+    // Wait for script to load
+    await new Promise<void>((resolve) => {
+      mapsJs.onload = () => {
+        this.mapScriptsLoaded = true;
+        resolve();
+      };
+    });
+  }
+  
+  // Create a map instance
+  createMap(container: HTMLElement, options: {
+    center?: [number, number],
+    zoom?: number,
+    style?: string
+  } = {}) {
+    if (!window.tomtom) {
+      console.error('TomTom SDK not loaded');
+      return null;
+    }
+    
+    return window.tomtom.L.map(container, {
+      key: this.apiKey,
+      container: container, // Adicionando a propriedade container
+      center: options.center || [0, 0],
+      zoom: options.zoom || 13,
+      style: options.style || 'main'
+    });
   }
   
   // Search by address or place name

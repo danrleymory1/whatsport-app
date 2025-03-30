@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/table";
 
 export default function ManagerDashboard() {
-  const { user } = useAuth();
+  const { user, userEmail } = useAuth();
   const router = useRouter();
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [pendingReservations, setPendingReservations] = useState<Reservation[]>([]);
@@ -62,7 +62,7 @@ export default function ManagerDashboard() {
         for (const space of spacesResponse.data || []) {
           const reservationsResponse = await apiService.getReservations(space.id);
           const pendingForSpace = (reservationsResponse.data || [])
-            .filter(r => r.status === ReservationStatus.PENDING);
+            .filter((r: Reservation) => r.status === ReservationStatus.PENDING);
           
           allPendingReservations = [...allPendingReservations, ...pendingForSpace];
         }
@@ -106,7 +106,7 @@ export default function ManagerDashboard() {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     
-    return reservations.filter(r => 
+    return reservations.filter((r: Reservation) => 
       new Date(r.start_time) >= startOfMonth && 
       r.status !== ReservationStatus.REJECTED && 
       r.status !== ReservationStatus.CANCELED
@@ -403,9 +403,9 @@ export default function ManagerDashboard() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="p-4 pt-0">
-                        <div className="flex items-center text-sm text-muted-foreground mb-2">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          <span className="truncate">{space.location.address}</span>
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          <span className="truncate">{space.location.address || 'Localização não disponível'}</span>
                         </div>
                         <div className="flex items-center text-sm text-muted-foreground">
                           <Users className="w-3 h-3 mr-1" />

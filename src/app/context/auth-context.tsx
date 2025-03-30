@@ -7,14 +7,15 @@ import { User, UserType } from '@/types/user';
 import { apiService } from '@/services/api-service';
 
 interface AuthContextProps {
-  isAuthenticated: boolean;
-  loading: boolean;
-  user: User | null;
-  userType: UserType | null;
-  login: (token: string, email: string) => void;
-  logout: () => void;
-  refreshUserData: () => Promise<void>;
-}
+    isAuthenticated: boolean;
+    loading: boolean;
+    user: User | null;
+    userEmail: string | null;
+    userType: UserType | null;
+    login: (token: string, email: string) => void;
+    logout: () => void;
+    refreshUserData: () => Promise<void>;
+  }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
@@ -31,118 +32,126 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
-  const [userType, setUserType] = useState<UserType | null>(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState<User | null>(null);
+    const [userType, setUserType] = useState<UserType | null>(null);
+    const [userEmail, setUserEmail] = useState<string | null>(null); // Adicione este estado
+    
+    const router = useRouter();
+    const pathname = usePathname();
   
-  const router = useRouter();
-  const pathname = usePathname();
-
-  // Fetch user data after authentication
-  const fetchUserData = async () => {
-    try {
-      const userData = await apiService.getCurrentUser();
-      setUser(userData.data);
-      setUserType(userData.data.user_type as UserType);
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-      setUser(null);
-      setUserType(null);
-    }
-  };
-
-  // Check auth status on initial load
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = Cookies.get('accessToken');
-      const storedEmail = localStorage.getItem("userEmail");
+    // Fetch user data after authentication
+    const fetchUserData = async () => {
+      try {
+        const userData = await apiService.getCurrentUser();
+        setUser(userData.data);
+        setUserType(userData.data.user_type as UserType);
+        setUserEmail(userData.data.email); // Defina o email aqui
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setUser(null);
+        setUserType(null);
+        // Não limpe o userEmail aqui para manter a compatibilidade com o localStorage
+      }
+    };
+  
+    // Check auth status on initial load
+    useEffect(() => {
+      const checkAuth = async () => {
+        const token = Cookies.get('accessToken');
+        const storedEmail = localStorage.getItem("userEmail");
+        
+        if (token) {
+          setIsAuthenticated(true);
+          setUserEmail(storedEmail); // Defina o email aqui também
+          await fetchUserData();
+        } else {
+          setIsAuthenticated(false);
+          setUser(null);
+          setUserType(null);
+          setUserEmail(null);
+          
+          // Redirect to login if trying to access protected routes
+          if (!pathname.startsWith('/auth') && !pathname.startsWith('/_next')) {
+            router.push('/auth/sign-in');
+          }
+        }
+        
+        setLoading(false);
+      };
       
-      if (token) {
-        setIsAuthenticated(true);
-        await fetchUserData();
+      checkAuth();
+    }, [pathname, router]);
+  
+    // Login function
+    const login = async (token: string, email: string) => {
+      Cookies.set('accessToken', token, {
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      });
+      
+      localStorage.setItem("userEmail", email);
+      setIsAuthenticated(true);
+      setUserEmail(email); // Defina o email aqui
+      
+      // Fetch user data after successful login
+      await fetchUserData();
+      
+      // Redirect based on user type
+      if (userType === UserType.PLAYER) {
+        router.push('/player/dashboard');
+      } else if (userType === UserType.MANAGER) {
+        router.push('/manager/dashboard');
       } else {
+        router.push('/');
+      }
+    };
+  
+    // Logout function
+    const logout = async () => {
+      try {
+        await apiService.logout();
+      } catch (error) {
+        console.error('Error during logout:', error);
+      } finally {
+        Cookies.remove('accessToken');
+        localStorage.removeItem("userEmail");
         setIsAuthenticated(false);
         setUser(null);
         setUserType(null);
-        
-        // Redirect to login if trying to access protected routes
-        if (!pathname.startsWith('/auth') && !pathname.startsWith('/_next')) {
-          router.push('/auth/sign-in');
-        }
+        setUserEmail(null);
+        router.push('/auth/sign-in');
       }
-      
-      setLoading(false);
     };
-    
-    checkAuth();
-  }, [pathname, router]);
-
-  // Login function
-  const login = async (token: string, email: string) => {
-    Cookies.set('accessToken', token, {
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-    });
-    
-    localStorage.setItem("userEmail", email);
-    setIsAuthenticated(true);
-    
-    // Fetch user data after successful login
-    await fetchUserData();
-    
-    // Redirect based on user type
-    if (userType === UserType.PLAYER) {
-      router.push('/player/dashboard');
-    } else if (userType === UserType.MANAGER) {
-      router.push('/manager/dashboard');
-    } else {
-      router.push('/');
-    }
-  };
-
-  // Logout function
-  const logout = async () => {
-    try {
-      await apiService.logout();
-    } catch (error) {
-      console.error('Error during logout:', error);
-    } finally {
-      Cookies.remove('accessToken');
-      localStorage.removeItem("userEmail");
-      setIsAuthenticated(false);
-      setUser(null);
-      setUserType(null);
-      router.push('/auth/sign-in');
-    }
-  };
-
-  // Function to refresh user data
-  const refreshUserData = async () => {
-    if (isAuthenticated) {
-      await fetchUserData();
-    }
-  };
-
-  const value = {
-    isAuthenticated,
-    loading,
-    user,
-    userType,
-    login,
-    logout,
-    refreshUserData
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {loading ? (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        </div>
-      ) : (
-        children
-      )}
-    </AuthContext.Provider>
-  );
-}
+  
+    // Function to refresh user data
+    const refreshUserData = async () => {
+      if (isAuthenticated) {
+        await fetchUserData();
+      }
+    };
+  
+    const value = {
+      isAuthenticated,
+      loading,
+      user,
+      userType,
+      userEmail, // Adicione ao valor do contexto
+      login,
+      logout,
+      refreshUserData
+    };
+  
+    return (
+      <AuthContext.Provider value={value}>
+        {loading ? (
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          children
+        )}
+      </AuthContext.Provider>
+    );
+  }

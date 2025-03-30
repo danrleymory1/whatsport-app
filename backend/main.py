@@ -1,18 +1,17 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware  # Importante para o frontend
-from .app.api import auth
+from fastapi.middleware.cors import CORSMiddleware
+from .app.api import auth, events, space
 
-app = FastAPI()
+app = FastAPI(title="WhatSport API", description="API para a plataforma WhatSport")
 
 # --- Configuração do CORS ---
-#  Permite requisições do frontend (ajuste as origens conforme necessário)
 origins = [
-    "http://localhost:3000"
+    "http://localhost:3000",  # Frontend Next.js em desenvolvimento
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],  # Permite todas as origens
+    allow_origins=origins,  # Para produção, use origins específicas em vez de '*'
     allow_credentials=True,
     allow_methods=["*"],  # Permite todos os métodos (GET, POST, etc.)
     allow_headers=["*"],  # Permite todos os headers
@@ -20,6 +19,8 @@ app.add_middleware(
 
 # --- Inclui as rotas ---
 app.include_router(auth.router)
+app.include_router(events.router, prefix="/api")
+app.include_router(space.router, prefix="/api")
 
 @app.get("/")
 async def read_root():

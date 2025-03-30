@@ -1,10 +1,10 @@
+// src/components/map/tomtom-map.tsx
 "use client";
 
 import { useRef, useEffect, useState } from 'react';
 import { Event } from '@/types/event';
 import { Button } from '@/components/ui/button';
 import { Locate, ZoomIn, ZoomOut } from 'lucide-react';
-import { useTheme } from 'next-themes';
 
 interface MapProps {
   apiKey: string;
@@ -26,11 +26,10 @@ export default function TomTomMap({
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [markerLayer, setMarkerLayer] = useState<any>(null);
-  const { theme } = useTheme();
   
   // Load TomTom SDK scripts
   useEffect(() => {
-    // Skip if already loaded
+    // Check if TomTom is already loaded
     if (window.tomtom) return;
     
     const loadMapScripts = async () => {
@@ -47,7 +46,7 @@ export default function TomTomMap({
       document.body.appendChild(mapsJs);
       
       // Wait for script to load
-      await new Promise<void>((resolve) => {
+      return new Promise<void>((resolve) => {
         mapsJs.onload = () => resolve();
       });
     };
@@ -59,12 +58,23 @@ export default function TomTomMap({
   useEffect(() => {
     if (!mapRef.current || !window.tomtom || !apiKey) return;
     
+    // Verificar se tomtom está definido
+    if (!window.tomtom) {
+      console.error('TomTom SDK não está carregado');
+      return;
+    }
+    
+    // Converter formato do centro se necessário
+    const center = initialCenter 
+      ? [initialCenter.lat, initialCenter.lng] as [number, number]
+      : [0, 0] as [number, number];
+    
     // Initialize map instance
     const map = window.tomtom.L.map(mapRef.current, {
       key: apiKey,
-      center: initialCenter || [0, 0],
+      container: mapRef.current, // Adicionando a propriedade container
+      center: center,
       zoom: initialZoom,
-      style: theme === 'dark' ? 'night' : 'main',
     });
     
     // Create marker layer
@@ -84,7 +94,7 @@ export default function TomTomMap({
         map.remove();
       }
     };
-  }, [apiKey, initialCenter, initialZoom, theme]);
+  }, [apiKey, initialCenter, initialZoom]);
   
   // Update markers when events change
   useEffect(() => {
@@ -96,6 +106,12 @@ export default function TomTomMap({
     // Add markers for events
     events.forEach((event) => {
       if (!event.location?.lat || !event.location?.lng) return;
+      
+      // Verificar se tomtom está definido
+      if (!window.tomtom) {
+        console.error('TomTom SDK não está carregado');
+        return;
+      }
       
       const marker = window.tomtom.L.marker([event.location.lat, event.location.lng], {
         icon: window.tomtom.L.icon({
@@ -134,31 +150,37 @@ export default function TomTomMap({
     }
   }, [events, mapInstance, markerLayer, onMarkerClick]);
   
-  // Handle theme change
-  useEffect(() => {
-    if (!mapInstance) return;
-    
-    mapInstance.setStyle(theme === 'dark' ? 'night' : 'main');
-  }, [theme, mapInstance]);
-  
   // Locate user
   const handleLocateUser = () => {
     if (!mapInstance) return;
     
-    mapInstance.locate({ setView: true, maxZoom: 15 });
+    // Verificação de segurança
+    try {
+      mapInstance.locate({ setView: true, maxZoom: 15 });
+    } catch (error) {
+      console.error('Erro ao localizar usuário:', error);
+    }
   };
   
   // Zoom controls
   const handleZoomIn = () => {
     if (!mapInstance) return;
     
-    mapInstance.zoomIn();
+    try {
+      mapInstance.zoomIn();
+    } catch (error) {
+      console.error('Erro ao aumentar zoom:', error);
+    }
   };
   
   const handleZoomOut = () => {
     if (!mapInstance) return;
     
-    mapInstance.zoomOut();
+    try {
+      mapInstance.zoomOut();
+    } catch (error) {
+      console.error('Erro ao diminuir zoom:', error);
+    }
   };
   
   return (
