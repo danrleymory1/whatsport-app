@@ -42,7 +42,7 @@ next-env.d.ts
 
 #backend env
 /backend/env
-
+/backend/venv
 
 .vscode
 /.vscode
