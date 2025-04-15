@@ -14,6 +14,11 @@ class SpacePhoto(BaseModel):
     url: str
     is_primary: bool = False
     added_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    model_config = {
+        "populate_by_name": True,
+        "arbitrary_types_allowed": True
+    }
 
 class SpaceSport(BaseModel):
     sport_type: str
@@ -37,8 +42,9 @@ class Space(MongoBaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        json_encoders = {
+    model_config = {
+        "json_encoders": {
             ObjectId: str,
             datetime: lambda dt: dt.isoformat()
         }
+    }

@@ -13,10 +13,22 @@ router = APIRouter(prefix="/users", tags=["users"])
 # Obter o perfil do usuário atual
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_profile(current_user=Depends(get_current_user)):
-    return {
-        "id": str(current_user["_id"]),
-        **{k: v for k, v in current_user.items() if k != "_id" and k != "hashed_password"}
-    }
+    user_dict = {}
+    for key, value in current_user.items():
+        if key == "_id":
+            user_dict["id"] = str(value)
+        elif isinstance(value, ObjectId):
+            user_dict[key] = str(value)
+        elif isinstance(value, datetime):
+            user_dict[key] = value.isoformat()
+        else:
+            user_dict[key] = value
+    
+    # Remove sensitive fields
+    if "hashed_password" in user_dict:
+        del user_dict["hashed_password"]
+    
+    return user_dict
 
 # Atualizar o perfil do usuário
 @router.put("/me", response_model=UserResponse)

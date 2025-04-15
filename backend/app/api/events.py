@@ -568,65 +568,89 @@ async def get_nearby_events(
     current_user=Depends(get_current_player),
     db=Depends(get_database)
 ):
-    # Filtrar eventos próximos 
-    # Em produção, seria melhor usar índices geoespaciais do MongoDB
+    try:
+        # Filtrar eventos próximos 
+        # Em produção, seria melhor usar índices geoespaciais do MongoDB
 
-    # Buscar todos os eventos futuros
-    now = datetime.utcnow()
-    filter_query = {
-        "end_time": {"$gte": now},
-        "$or": [
-            {"is_private": False},
-            {"organizer_id": str(current_user["_id"])},
-            {"participants.user_id": str(current_user["_id"])}
-        ]
-    }
-    
-    # Buscar eventos
-    cursor = db.events.find(filter_query)
-    
-    events_with_distance = []
-    async for doc in cursor:
-        # Calcular distância aproximada
-        event_lat = doc["location"]["lat"]
-        event_lng = doc["location"]["lng"]
+        # Buscar todos os eventos futuros
+        now = datetime.utcnow()
+        filter_query = {
+            "end_time": {"$gte": now},
+            "$or": [
+                {"is_private": False},
+                {"organizer_id": str(current_user["_id"])},
+                {"participants.user_id": str(current_user["_id"])}
+            ]
+        }
         
-        # Cálculo aproximado da distância usando a fórmula de Haversine
-        from math import sin, cos, sqrt, atan2, radians
+        # Buscar eventos
+        cursor = db.events.find(filter_query)
         
-        R = 6371  # Raio da Terra em km
-        dlat = radians(event_lat - lat)
-        dlng = radians(event_lng - lng)
+        events_with_distance = []
+        async for doc in cursor:
+            try:
+                # Calcular distância aproximada
+                event_lat = doc["location"]["lat"]
+                event_lng = doc["location"]["lng"]
+                
+                # Cálculo aproximado da distância usando a fórmula de Haversine
+                from math import sin, cos, sqrt, atan2, radians
+                
+                R = 6371  # Raio da Terra em km
+                dlat = radians(event_lat - lat)
+                dlng = radians(event_lng - lng)
+                
+                a = sin(dlat/2)**2 + cos(radians(lat)) * cos(radians(event_lat)) * sin(dlng/2)**2
+                c = 2 * atan2(sqrt(a), sqrt(1-a))
+                distance = R * c
+                
+                if distance <= radius:
+                    event_data = {
+                        "id": str(doc["_id"]),
+                        "distance": distance,
+                    }
+                    
+                    # Copy all fields except _id which we already handled
+                    for k, v in doc.items():
+                        if k != "_id":
+                            # Convert any ObjectId to string
+                            if isinstance(v, ObjectId):
+                                event_data[k] = str(v)
+                            # Convert datetime to ISO format string
+                            elif isinstance(v, datetime):
+                                event_data[k] = v.isoformat()
+                            else:
+                                event_data[k] = v
+                                
+                    events_with_distance.append(event_data)
+            except Exception as e:
+                print(f"Error processing event: {e}")
+                continue
         
-        a = sin(dlat/2)**2 + cos(radians(lat)) * cos(radians(event_lat)) * sin(dlng/2)**2
-        c = 2 * atan2(sqrt(a), sqrt(1-a))
-        distance = R * c
+        # Ordenar por distância
+        events_with_distance.sort(key=lambda e: e["distance"])
         
-        if distance <= radius:
-            events_with_distance.append({
-                "id": str(doc["_id"]),
-                "distance": distance,
-                **{k: v for k, v in doc.items() if k != "_id"}
-            })
-    
-    # Ordenar por distância
-    events_with_distance.sort(key=lambda e: e["distance"])
-    
-    # Paginação manual
-    total = len(events_with_distance)
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    paginated_events = events_with_distance[start_idx:end_idx]
-    
-    # Remover campo distance antes de retornar
-    events = []
-    for event in paginated_events:
-        distance = event.pop("distance", None)
-        events.append(event)
-    
-    return {
-        "events": events,
-        "total": total,
-        "page": page,
-        "per_page": per_page
-    }
+        # Paginação manual
+        total = len(events_with_distance)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_events = events_with_distance[start_idx:end_idx]
+        
+        # Remover campo distance antes de retornar
+        events = []
+        for event in paginated_events:
+            distance = event.pop("distance", None)
+            events.append(event)
+        
+        return {
+            "events": events,
+            "total": total,
+            "page": page,
+            "per_page": per_page
+        }
+    except Exception as e:
+        print(f"Error in get_nearby_events: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )

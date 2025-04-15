@@ -73,10 +73,11 @@ export function SignInForm() {
   
       console.log("Login bem-sucedido:", response);
       
-      // Verificar se response.data existe antes de acessar
-      if (response.data && response.data.access_token) {
-        login(response.data.access_token, data.email);
+      // Direct access to response properties (no data wrapper)
+      if (response && response.access_token) {
+        login(response.access_token, data.email);
       } else {
+        console.error("Response structure:", JSON.stringify(response));
         throw new Error("Resposta da API inválida");
       }
       
@@ -87,7 +88,7 @@ export function SignInForm() {
       setLoading(false);
     }
   }
-
+  
   return (
     <>
       {successMessage && (

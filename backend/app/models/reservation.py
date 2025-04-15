@@ -35,8 +35,9 @@ class Reservation(MongoBaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        json_encoders = {
+    model_config = {
+        "json_encoders": {
             ObjectId: str,
             datetime: lambda dt: dt.isoformat()
         }
+    }

@@ -30,6 +30,7 @@ interface ApiResponse<T> {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 class ApiService {
+
   private async request<T>(
     endpoint: string, 
     method: string = 'GET', 
@@ -38,42 +39,59 @@ class ApiService {
   ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     
+    // Get token from both cookie and localStorage as fallback
+    const token = Cookies.get('accessToken') || localStorage.getItem('accessToken');
+    
     const headers: HeadersInit = {};
     
-    // Adiciona o token de autenticação se disponível
-    const token = Cookies.get('accessToken');
+    // Always include token if available
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+      console.log(`Using token for ${endpoint}: ${token.substring(0, 15)}...`);
+    } else {
+      console.warn(`No token available for ${endpoint}`);
     }
     
-    // Define o tipo de conteúdo com base no parâmetro useFormData
+    // Define content type
     if (!useFormData) {
       headers['Content-Type'] = 'application/json';
     }
     
-    // Prepara o corpo da requisição com base no método e no uso de FormData
+    // Prepare request body
     let body: string | URLSearchParams | undefined;
     if (data) {
       if (useFormData) {
-        // Para o login via OAuth2, precisamos usar application/x-www-form-urlencoded
         body = new URLSearchParams(data);
       } else {
         body = JSON.stringify(data);
       }
     }
-    
+  
     try {
       const response = await fetch(url, {
         method,
         headers,
         body,
-        credentials: 'include' // Inclui cookies nas requisições cross-origin
+        credentials: 'include',
+        mode: 'cors'
       });
       
-      const responseData = await response.json();
+      // Handle empty responses
+      if (response.status === 204 || response.headers.get('content-length') === '0') {
+        return {} as T;
+      }
+      
+      // Parse response
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (e) {
+        throw new Error("Invalid response format");
+      }
       
       if (!response.ok) {
-        throw new Error(responseData.detail || responseData.message || 'Ocorreu um erro na requisição');
+        console.error(`API Error (${method} ${endpoint}):`, responseData);
+        throw new Error(responseData.detail || responseData.message || 'Request error');
       }
       
       return responseData;
@@ -88,9 +106,39 @@ class ApiService {
     return this.request('/auth/sign-up', 'POST', data);
   }
   
-  async login(data: LoginPayload): Promise<ApiResponse<{ access_token: string, token_type: string }>> {
-    return this.request('/auth/sign-in', 'POST', data, true);
-}
+  async login(data: LoginPayload): Promise<any> {
+    try {
+      const url = `${API_BASE_URL}/auth/sign-in`;
+      
+      // Create form data for OAuth2
+      const formData = new URLSearchParams();
+      formData.append('username', data.username);
+      formData.append('password', data.password);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData,
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Erro ao fazer login');
+      }
+      
+      const responseData = await response.json();
+      console.log('Login API response:', responseData);
+      
+      return responseData;
+    } catch (error) {
+      console.error('Login API error:', error);
+      throw error;
+    }
+  }
   
   async forgotPassword(data: ForgotPasswordPayload): Promise<ApiResponse<any>> {
     return this.request('/auth/forgot-password', 'POST', data);
@@ -110,14 +158,20 @@ class ApiService {
     return this.request(`/player/events${queryParams}`);
   }
   
-  async getNearbyEvents(location: { lat: number, lng: number }, radius?: number): Promise<ApiResponse<any>> {
+async getNearbyEvents(location: { lat: number, lng: number }, radius?: number): Promise<ApiResponse<any>> {
+  try {
     const queryParams = new URLSearchParams({
       lat: location.lat.toString(),
       lng: location.lng.toString(),
       radius: (radius || 10).toString()
     });
+    
     return this.request(`/player/events/nearby?${queryParams.toString()}`);
+  } catch (error) {
+    console.error("Error fetching nearby events:", error);
+    return { data: { events: [], total: 0, page: 1, per_page: 10 } };
   }
+}
   
   async createEvent(eventData: any): Promise<ApiResponse<any>> {
     return this.request('/player/events', 'POST', eventData);
@@ -152,9 +206,45 @@ class ApiService {
     return this.request(`/manager/reservations/${reservationId}/reject`, 'POST');
   }
   
-  // Métodos compartilhados
   async getCurrentUser(): Promise<ApiResponse<any>> {
-    return this.request('/users/me');
+    try {
+      const url = `${API_BASE_URL}/users/me`;
+      
+      // Get the token from cookies
+      const token = Cookies.get('accessToken');
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      const headers: HeadersInit = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Unauthorized - Authentication failed');
+        }
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to get user data');
+      }
+      
+      const responseData = await response.json();
+      console.log('User data response:', responseData);
+      
+      return { data: responseData };
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      throw error;
+    }
   }
   
   async updateProfile(profileData: any): Promise<ApiResponse<any>> {
@@ -177,7 +267,7 @@ class ApiService {
       notification_ids: notificationIds
     });
   }
-  
+
 }
 
 

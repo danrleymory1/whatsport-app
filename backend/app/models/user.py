@@ -1,25 +1,20 @@
-# backend/app/models/user.py
-from typing import Optional, List
+# backend/app/models/user.py - simplified version of PyObjectId class
+from typing import Optional, List, Any, Annotated
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, BeforeValidator
 from bson import ObjectId
 
-# Helper para ID do MongoDB
-class PyObjectId(ObjectId):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
+# Simpler PyObjectId approach using annotations
+def validate_object_id(v: Any) -> str:
+    if isinstance(v, ObjectId):
+        return str(v)
+    if not ObjectId.is_valid(v):
+        raise ValueError("Invalid ObjectId")
+    return str(v)
 
-    @classmethod
-    def validate(cls, v, _):  
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid ObjectId")
-        return ObjectId(v)
-
-    @classmethod
-    def __get_pydantic_json_schema__(cls, schema_generator):
-        return schema_generator({"type": "string"})
+# Annotated type for ObjectId
+PyObjectId = Annotated[str, BeforeValidator(validate_object_id)]
 
 # Tipo de usuário
 class UserType(str, Enum):
@@ -30,12 +25,14 @@ class UserType(str, Enum):
 class MongoBaseModel(BaseModel):
     id: Optional[PyObjectId] = Field(default=None, alias="_id")
 
-    class Config:
-        populate_by_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {
+    model_config = {
+        "populate_by_name": True,
+        "arbitrary_types_allowed": True,
+        "json_schema_extra": {"example": {"id": "123456789012345678901234"}},
+        "json_encoders": {
             ObjectId: str
         }
+    }
 
 # Modelo principal do usuário
 class User(MongoBaseModel):

@@ -5,9 +5,11 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-
 from ..core.config import settings
 from ..core.database import get_database
+import bcrypt
+if not hasattr(bcrypt, '__about__'):
+    bcrypt.__about__ = type('ModuleInfo', (), {'__version__': bcrypt.__version__})
 
 # OAuth2 scheme para a rota /auth/sign-in
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/sign-in")
@@ -44,7 +46,8 @@ def decode_token(token: str) -> Optional[dict]:
         if email is None:
             return None
         return {"email": email}
-    except JWTError:
+    except JWTError as e:
+        print(f"JWT Error: {str(e)}")
         return None
 
 # Função para obter o usuário atual a partir do token
@@ -55,16 +58,23 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db=Depends(get_d
         headers={"WWW-Authenticate": "Bearer"},
     )
     
+    if not token:
+        print("No token provided")
+        raise credentials_exception
+        
     token_data = decode_token(token)
     if token_data is None:
+        print("Invalid token data")
         raise credentials_exception
         
     email = token_data.get("email")
     if email is None:
+        print("No email in token data")
         raise credentials_exception
         
     user = await db.users.find_one({"email": email})
     if user is None:
+        print(f"User not found for email: {email}")
         raise credentials_exception
         
     return user

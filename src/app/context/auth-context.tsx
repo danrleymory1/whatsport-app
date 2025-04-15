@@ -44,66 +44,113 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Fetch user data after authentication
     const fetchUserData = async () => {
       try {
+        // Only attempt to fetch if we have a token
+        const token = Cookies.get('accessToken');
+        if (!token) {
+          console.log('No token available, skipping user data fetch');
+          return;
+        }
+    
         const userData = await apiService.getCurrentUser();
-        setUser(userData.data);
-        setUserType(userData.data.user_type as UserType);
-        setUserEmail(userData.data.email); // Defina o email aqui
+        
+        if (userData && userData.data) {
+          setUser(userData.data);
+          setUserType(userData.data.user_type as UserType);
+          setUserEmail(userData.data.email);
+        } else {
+          // Handle empty or invalid response
+          console.warn('Empty or invalid user data response');
+          // Don't throw error, but mark as unauthenticated if needed
+          if (!userEmail) {
+            setIsAuthenticated(false);
+          }
+        }
       } catch (error) {
         console.error('Error fetching user data:', error);
-        setUser(null);
-        setUserType(null);
-        // Não limpe o userEmail aqui para manter a compatibilidade com o localStorage
+        // Don't clear authentication state on fetch error
+        // Only clear if token is invalid/expired
+        if (error instanceof Error && error.message.includes('Unauthorized')) {
+          setIsAuthenticated(false);
+          setUser(null);
+          setUserType(null);
+        }
       }
     };
   
     // Check auth status on initial load
     useEffect(() => {
       const checkAuth = async () => {
-        const token = Cookies.get('accessToken');
+        const token = Cookies.get('accessToken') || localStorage.getItem('accessToken');
         const storedEmail = localStorage.getItem("userEmail");
         
+        setLoading(true);
+        
         if (token) {
-          setIsAuthenticated(true);
-          setUserEmail(storedEmail); // Defina o email aqui também
-          await fetchUserData();
+          try {
+            setIsAuthenticated(true);
+            setUserEmail(storedEmail);
+            await fetchUserData();
+          } catch (error) {
+            console.error("Error during authentication check:", error);
+            // Only redirect to login if we're not already on a login page
+            if (!pathname.startsWith('/auth/')) {
+              router.push('/auth/sign-in');
+            }
+          } finally {
+            setLoading(false);
+          }
         } else {
           setIsAuthenticated(false);
           setUser(null);
           setUserType(null);
           setUserEmail(null);
           
-          // Redirect to login if trying to access protected routes
-          if (!pathname.startsWith('/auth') && !pathname.startsWith('/_next')) {
+          // Only redirect to login if we're not already on a public route
+          if (!pathname.startsWith('/auth/') && !pathname.startsWith('/_next')) {
             router.push('/auth/sign-in');
           }
+          
+          setLoading(false);
         }
-        
-        setLoading(false);
       };
       
       checkAuth();
-    }, [pathname, router]);
-  
+    }, [pathname]);
+    
     // Login function
     const login = async (token: string, email: string) => {
-      Cookies.set('accessToken', token, {
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-      });
-      
-      localStorage.setItem("userEmail", email);
-      setIsAuthenticated(true);
-      setUserEmail(email); // Defina o email aqui
-      
-      // Fetch user data after successful login
-      await fetchUserData();
-      
-      // Redirect based on user type
-      if (userType === UserType.PLAYER) {
-        router.push('/player/dashboard');
-      } else if (userType === UserType.MANAGER) {
-        router.push('/manager/dashboard');
-      } else {
+      try {
+        // Store token in both cookie and localStorage
+        Cookies.set('accessToken', token, {
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          expires: 1 // 1 day
+        });
+        
+        localStorage.setItem('accessToken', token);
+        localStorage.setItem("userEmail", email);
+        
+        setIsAuthenticated(true);
+        setUserEmail(email);
+        
+        // Get user data
+        await fetchUserData();
+        
+        // Set a delay before redirecting
+        setTimeout(() => {
+          if (userType === UserType.PLAYER) {
+            router.push('/');
+          } else if (userType === UserType.MANAGER) {
+            router.push('/manager/dashboard');
+          } else {
+            router.push('/');
+          }
+        }, 500); // Short delay to allow state to update
+        
+      } catch (error) {
+        console.error("Login error:", error);
+        setIsAuthenticated(true); // Still set authenticated based on successful token
+        setUserEmail(email);
         router.push('/');
       }
     };

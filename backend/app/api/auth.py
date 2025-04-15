@@ -27,7 +27,6 @@ from ..schemas.user import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Rota para registro (sign-up)
 @router.post("/sign-up", response_model=Message, status_code=status.HTTP_201_CREATED)
 async def sign_up(user: UserCreate, db=Depends(get_database)):
     # Verifica se o usuário já existe
@@ -49,16 +48,19 @@ async def sign_up(user: UserCreate, db=Depends(get_database)):
     )
 
     # Insere no banco de dados
-    await db.users.insert_one(new_user.dict(by_alias=True, exclude={"id"}))
+    result = await db.users.insert_one(new_user.dict(by_alias=True, exclude={"id"}))
+    
+    # Obter o ID gerado pelo MongoDB
+    user_id = result.inserted_id
 
     # Cria um perfil específico dependendo do tipo de usuário
     if user.user_type == UserType.PLAYER:
         from ..models.user import PlayerProfile
-        player_profile = PlayerProfile(user_id=new_user.id)
+        player_profile = PlayerProfile(user_id=user_id)
         await db.player_profiles.insert_one(player_profile.dict(by_alias=True, exclude={"id"}))
     elif user.user_type == UserType.MANAGER:
         from ..models.user import ManagerProfile
-        manager_profile = ManagerProfile(user_id=new_user.id)
+        manager_profile = ManagerProfile(user_id=user_id)
         await db.manager_profiles.insert_one(manager_profile.dict(by_alias=True, exclude={"id"}))
 
     return {"message": "Usuário cadastrado com sucesso"}

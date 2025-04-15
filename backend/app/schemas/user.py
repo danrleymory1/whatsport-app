@@ -72,7 +72,7 @@ class ManagerProfileResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
-    user: UserResponse
+    user: dict
 
 class Message(BaseModel):
     message: str

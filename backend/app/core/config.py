@@ -1,6 +1,6 @@
 # backend/app/core/config.py
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+from typing import Optional, List
 
 class Settings(BaseSettings):
     # .env file config
@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     
     # Configurações para CORS
     FRONTEND_URL: str = "http://localhost:3000"
-    ALLOW_ORIGINS: list[str] = ["http://localhost:3000"]
+    ALLOW_ORIGINS: List[str] = ["http://localhost:3000"]
     
     # Configurações opcionais
     NEXT_PUBLIC_TOMTOM_KEY: Optional[str] = None
