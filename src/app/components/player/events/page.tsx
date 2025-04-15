@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form"; // Adicione Controller
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -45,7 +45,7 @@ import { CalendarIcon, Plus, Trash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import TomTomMap from "@/components/map/tomtom-map";
+import LeafletMap from "@/components/map/leaflet-map";
 import { mapService } from "@/services/map-service";
 import { apiService } from "@/services/api-service";
 
@@ -142,7 +142,7 @@ export default function CreateEventPage() {
     },
   });
   
-  // Pesquisar endereço usando a API TomTom
+  // Pesquisar endereço usando a API Nominatim (OpenStreetMap)
   const handleAddressSearch = async () => {
     if (!searchAddress.trim()) return;
     
@@ -555,7 +555,7 @@ export default function CreateEventPage() {
                         className="p-2 hover:bg-muted cursor-pointer"
                         onClick={() => selectAddress(result)}
                       >
-                        {result.address.freeformAddress}
+                        {result.display_name}
                       </li>
                     ))}
                   </ul>
@@ -578,8 +578,7 @@ export default function CreateEventPage() {
               
               <div className="h-64 rounded-md overflow-hidden border">
                 {form.watch("location.lat") !== 0 && form.watch("location.lng") !== 0 ? (
-                  <TomTomMap
-                    apiKey={process.env.NEXT_PUBLIC_TOMTOM_KEY || ""}
+                  <LeafletMap
                     initialCenter={{
                       lat: form.watch("location.lat"),
                       lng: form.watch("location.lng"),

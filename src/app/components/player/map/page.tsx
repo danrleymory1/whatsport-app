@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { apiService } from "@/services/api-service";
 import { mapService } from "@/services/map-service";
-import TomTomMap from "@/components/map/tomtom-map";
+import LeafletMap from "@/components/map/leaflet-map";
 import { Event } from "@/types/event";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -70,8 +70,7 @@ export default function EventsMapPage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <TomTomMap
-                  apiKey={process.env.NEXT_PUBLIC_TOMTOM_KEY || ""}
+                <LeafletMap
                   events={events}
                   onMarkerClick={handleMarkerClick}
                   initialCenter={userLocation || undefined}

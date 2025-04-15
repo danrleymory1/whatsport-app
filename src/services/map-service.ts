@@ -1,26 +1,26 @@
 // src/services/map-service.ts
 import { Location } from '@/types/event';
 
-// TomTom API types
+// Search result interface for Nominatim (OSM geocoding service)
 interface SearchResult {
-  id: string;
-  score: number;
-  address: {
-    freeformAddress: string;
-    streetName?: string;
-    municipality?: string;
-    countrySubdivision?: string;
-    postalCode?: string;
+  place_id: number;
+  licence: string;
+  osm_type: string;
+  osm_id: number;
+  boundingbox: string[];
+  lat: string;
+  lon: string;
+  display_name: string;
+  class: string;
+  type: string;
+  importance: number;
+  address?: {
+    road?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
     country?: string;
   };
-  position: {
-    lat: number;
-    lon: number;
-  };
-}
-
-interface SearchResponse {
-  results: SearchResult[];
 }
 
 interface GeocodingOptions {
@@ -29,82 +29,70 @@ interface GeocodingOptions {
 }
 
 class MapService {
-  private readonly apiKey: string;
-  private readonly baseUrl: string = 'https://api.tomtom.com';
+  private readonly baseUrl: string = 'https://nominatim.openstreetmap.org';
   private mapScriptsLoaded: boolean = false;
   
   constructor() {
-    this.apiKey = process.env.NEXT_PUBLIC_TOMTOM_KEY || '';
-    if (!this.apiKey) {
-      console.warn('TomTom API key not found. Map functionality will be limited.');
-    }
+    // Nothing needed here for Leaflet implementation
   }
   
-  // Load TomTom SDK scripts if they aren't already loaded
+  // Load Leaflet SDK scripts if they aren't already loaded
   async loadMapScripts(): Promise<void> {
     if (typeof window === 'undefined') return;
     
-    // Check if TomTom is already loaded
-    if (window.tomtom || this.mapScriptsLoaded) return;
+    // Check if Leaflet is already loaded
+    if (window.L || this.mapScriptsLoaded) return;
     
     // Load CSS
-    const mapsCss = document.createElement('link');
-    mapsCss.rel = 'stylesheet';
-    mapsCss.href = 'https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps.css';
-    document.head.appendChild(mapsCss);
+    const leafletCss = document.createElement('link');
+    leafletCss.rel = 'stylesheet';
+    leafletCss.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    leafletCss.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+    leafletCss.crossOrigin = '';
+    document.head.appendChild(leafletCss);
     
     // Load JS
-    const mapsJs = document.createElement('script');
-    mapsJs.src = 'https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps-web.min.js';
-    mapsJs.async = true;
-    document.body.appendChild(mapsJs);
+    const leafletJs = document.createElement('script');
+    leafletJs.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    leafletJs.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+    leafletJs.crossOrigin = '';
+    document.body.appendChild(leafletJs);
     
     // Wait for script to load
     await new Promise<void>((resolve) => {
-      mapsJs.onload = () => {
+      leafletJs.onload = () => {
         this.mapScriptsLoaded = true;
         resolve();
       };
     });
   }
   
-  // Create a map instance
-  createMap(container: HTMLElement, options: {
-    center?: [number, number],
-    zoom?: number,
-    style?: string
-  } = {}) {
-    if (!window.tomtom) {
-      console.error('TomTom SDK not loaded');
-      return null;
-    }
-    
-    return window.tomtom.L.map(container, {
-      key: this.apiKey,
-      container: container, // Adicionando a propriedade container
-      center: options.center || [0, 0],
-      zoom: options.zoom || 13,
-      style: options.style || 'main'
-    });
-  }
-  
-  // Search by address or place name
+  // Search by address or place name using Nominatim
   async searchAddress(query: string, options: GeocodingOptions = {}): Promise<SearchResult[]> {
-    if (!this.apiKey) return [];
+    // Build URL with search parameters
+    const params = new URLSearchParams({
+      q: query,
+      format: 'json',
+      addressdetails: '1'
+    });
     
-    const url = new URL(`${this.baseUrl}/search/2/search/${encodeURIComponent(query)}.json`);
-    
-    // Add API key and options
-    url.searchParams.append('key', this.apiKey);
-    if (options.limit) url.searchParams.append('limit', options.limit.toString());
-    if (options.countrySet) url.searchParams.append('countrySet', options.countrySet);
+    if (options.limit) params.append('limit', options.limit.toString());
+    if (options.countrySet) params.append('countrycodes', options.countrySet);
     
     try {
-      const response = await fetch(url.toString());
+      // Add a small delay to respect Nominatim usage policy (1 request per second)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const response = await fetch(`${this.baseUrl}/search?${params.toString()}`, {
+        headers: {
+          'User-Agent': 'WhatsportApp/1.0'  // Best practice for Nominatim API
+        }
+      });
+      
       if (!response.ok) throw new Error('Failed to search address');
       
-      const data: SearchResponse = await response.json();
-      return data.results;
+      const data: SearchResult[] = await response.json();
+      return data;
     } catch (error) {
       console.error('Error searching address:', error);
       return [];
@@ -113,17 +101,27 @@ class MapService {
   
   // Reverse geocoding (get address from coordinates)
   async reverseGeocode(lat: number, lon: number): Promise<SearchResult | null> {
-    if (!this.apiKey) return null;
-    
-    const url = new URL(`${this.baseUrl}/search/2/reverseGeocode/${lat},${lon}.json`);
-    url.searchParams.append('key', this.apiKey);
+    const params = new URLSearchParams({
+      lat: lat.toString(),
+      lon: lon.toString(),
+      format: 'json',
+      addressdetails: '1'
+    });
     
     try {
-      const response = await fetch(url.toString());
+      // Add a small delay to respect Nominatim usage policy
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const response = await fetch(`${this.baseUrl}/reverse?${params.toString()}`, {
+        headers: {
+          'User-Agent': 'WhatsportApp/1.0'
+        }
+      });
+      
       if (!response.ok) throw new Error('Failed to reverse geocode');
       
-      const data: SearchResponse = await response.json();
-      return data.results[0] || null;
+      const data: SearchResult = await response.json();
+      return data;
     } catch (error) {
       console.error('Error reverse geocoding:', error);
       return null;
@@ -133,12 +131,12 @@ class MapService {
   // Convert SearchResult to our Location type
   toLocation(result: SearchResult): Location {
     return {
-      lat: result.position.lat,
-      lng: result.position.lon,
-      address: result.address.freeformAddress,
-      city: result.address.municipality,
-      state: result.address.countrySubdivision,
-      postal_code: result.address.postalCode
+      lat: parseFloat(result.lat),
+      lng: parseFloat(result.lon),
+      address: result.display_name,
+      city: result.address?.city,
+      state: result.address?.state,
+      postal_code: result.address?.postcode
     };
   }
   
@@ -185,4 +183,5 @@ class MapService {
   }
 }
 
+// Export the map service as a singleton instance
 export const mapService = new MapService();

@@ -5,7 +5,7 @@ import { useAuth } from "@/app/context/auth-context";
 import { apiService } from "@/services/api-service";
 import { mapService } from "@/services/map-service";
 import { Event } from "@/types/event";
-import TomTomMap from "@/components/map/tomtom-map";
+import LeafletMap from "@/components/map/leaflet-map";
 import {
   Card,
   CardContent,
@@ -99,8 +99,7 @@ export default function PlayerDashboard() {
         </CardHeader>
         <CardContent>
           <div className="h-[400px] rounded-md overflow-hidden">
-            <TomTomMap
-              apiKey={process.env.NEXT_PUBLIC_TOMTOM_KEY || ""}
+            <LeafletMap
               events={events}
               onMarkerClick={handleEventClick}
               initialCenter={userLocation || undefined}

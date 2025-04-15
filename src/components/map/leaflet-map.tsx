@@ -1,13 +1,13 @@
-// src/components/map/tomtom-map.tsx
+// src/components/map/leaflet-map.tsx
 "use client";
 
 import { useRef, useEffect, useState } from 'react';
 import { Event } from '@/types/event';
 import { Button } from '@/components/ui/button';
 import { Locate, ZoomIn, ZoomOut } from 'lucide-react';
+import 'leaflet/dist/leaflet.css';
 
 interface MapProps {
-  apiKey: string;
   events?: Event[];
   onMarkerClick?: (event: Event) => void;
   initialCenter?: { lat: number; lng: number };
@@ -15,8 +15,14 @@ interface MapProps {
   height?: string;
 }
 
-export default function TomTomMap({
-  apiKey,
+// Defining types for Leaflet since we're loading it dynamically
+declare global {
+  interface Window {
+    L: any;
+  }
+}
+
+export default function LeafletMap({
   events = [],
   onMarkerClick,
   initialCenter,
@@ -26,59 +32,60 @@ export default function TomTomMap({
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [markerLayer, setMarkerLayer] = useState<any>(null);
+  const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   
-  // Load TomTom SDK scripts
+  // Load Leaflet scripts
   useEffect(() => {
-    // Check if TomTom is already loaded
-    if (window.tomtom) return;
+    // Check if Leaflet is already loaded
+    if (window.L) {
+      setIsLeafletLoaded(true);
+      return;
+    }
     
-    const loadMapScripts = async () => {
+    const loadLeaflet = async () => {
       // Load CSS
-      const mapsCss = document.createElement('link');
-      mapsCss.rel = 'stylesheet';
-      mapsCss.href = 'https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps.css';
-      document.head.appendChild(mapsCss);
+      const leafletCss = document.createElement('link');
+      leafletCss.rel = 'stylesheet';
+      leafletCss.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      leafletCss.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+      leafletCss.crossOrigin = '';
+      document.head.appendChild(leafletCss);
       
       // Load JS
-      const mapsJs = document.createElement('script');
-      mapsJs.src = 'https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.23.0/maps/maps-web.min.js';
-      mapsJs.async = true;
-      document.body.appendChild(mapsJs);
+      const leafletJs = document.createElement('script');
+      leafletJs.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      leafletJs.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+      leafletJs.crossOrigin = '';
+      document.body.appendChild(leafletJs);
       
       // Wait for script to load
-      return new Promise<void>((resolve) => {
-        mapsJs.onload = () => resolve();
-      });
+      leafletJs.onload = () => {
+        setIsLeafletLoaded(true);
+      };
     };
     
-    loadMapScripts();
+    loadLeaflet();
   }, []);
   
   // Initialize map
   useEffect(() => {
-    if (!mapRef.current || !window.tomtom || !apiKey) return;
+    if (!mapRef.current || !isLeafletLoaded) return;
     
-    // Verificar se tomtom está definido
-    if (!window.tomtom) {
-      console.error('TomTom SDK não está carregado');
-      return;
-    }
-    
-    // Converter formato do centro se necessário
+    // Convert format of center if necessary
     const center = initialCenter 
-      ? [initialCenter.lat, initialCenter.lng] as [number, number]
-      : [0, 0] as [number, number];
+      ? [initialCenter.lat, initialCenter.lng]
+      : [0, 0];
     
     // Initialize map instance
-    const map = window.tomtom.L.map(mapRef.current, {
-      key: apiKey,
-      container: mapRef.current, // Adicionando a propriedade container
-      center: center,
-      zoom: initialZoom,
-    });
+    const map = window.L.map(mapRef.current).setView(center, initialZoom);
+    
+    // Add OpenStreetMap tile layer
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
     
     // Create marker layer
-    const layer = window.tomtom.L.featureGroup().addTo(map);
+    const layer = window.L.featureGroup().addTo(map);
     
     setMapInstance(map);
     setMarkerLayer(layer);
@@ -94,11 +101,11 @@ export default function TomTomMap({
         map.remove();
       }
     };
-  }, [apiKey, initialCenter, initialZoom]);
+  }, [initialCenter, initialZoom, isLeafletLoaded]);
   
   // Update markers when events change
   useEffect(() => {
-    if (!mapInstance || !markerLayer || !events.length) return;
+    if (!mapInstance || !markerLayer || !events.length || !isLeafletLoaded) return;
     
     // Clear previous markers
     markerLayer.clearLayers();
@@ -107,29 +114,27 @@ export default function TomTomMap({
     events.forEach((event) => {
       if (!event.location?.lat || !event.location?.lng) return;
       
-      // Verificar se tomtom está definido
-      if (!window.tomtom) {
-        console.error('TomTom SDK não está carregado');
-        return;
-      }
+      // Create custom icon
+      const customIcon = window.L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color: #3B82F6; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">${event.sport_type.charAt(0)}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      });
       
-      const marker = window.tomtom.L.marker([event.location.lat, event.location.lng], {
-        icon: window.tomtom.L.icon({
-          iconUrl: '/icons/event-marker.svg',
-          iconSize: [30, 30],
-          iconAnchor: [15, 30],
-        }),
+      const marker = window.L.marker([event.location.lat, event.location.lng], {
+        icon: customIcon,
         title: event.title,
       });
       
       // Add popup
       marker.bindPopup(`
         <div class="event-popup">
-          <h3>${event.title}</h3>
-          <p>${event.description.substring(0, 100)}${event.description.length > 100 ? '...' : ''}</p>
+          <h3 style="font-weight: bold; margin-bottom: 8px;">${event.title}</h3>
+          <p style="margin-bottom: 8px;">${event.description.substring(0, 100)}${event.description.length > 100 ? '...' : ''}</p>
           <p><strong>Esporte:</strong> ${event.sport_type}</p>
           <p><strong>Data:</strong> ${new Date(event.start_time).toLocaleString('pt-BR')}</p>
-          <button class="view-event-btn">Ver Detalhes</button>
+          <button style="background-color: #3B82F6; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 8px;">Ver Detalhes</button>
         </div>
       `);
       
@@ -148,13 +153,12 @@ export default function TomTomMap({
     if (events.length > 0) {
       mapInstance.fitBounds(markerLayer.getBounds(), { padding: [50, 50] });
     }
-  }, [events, mapInstance, markerLayer, onMarkerClick]);
+  }, [events, mapInstance, markerLayer, onMarkerClick, isLeafletLoaded]);
   
   // Locate user
   const handleLocateUser = () => {
     if (!mapInstance) return;
     
-    // Verificação de segurança
     try {
       mapInstance.locate({ setView: true, maxZoom: 15 });
     } catch (error) {
