@@ -1,12 +1,11 @@
-// src/app/page.tsx - Fixed home page to handle auth correctly
-
+// src/app/page.tsx
 "use client";
 
 import { useAuth } from "./context/auth-context";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
-import PlayerDashboard from "./components/player/dashboard";
-import ManagerDashboard from "./components/manager/dashboard";
+import PlayerDashboard from "../components/player/dashboard";
+import ManagerDashboard from "../components/manager/dashboard";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function Home() {

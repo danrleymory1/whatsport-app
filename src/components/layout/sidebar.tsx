@@ -1,3 +1,4 @@
+//src/components/layout/sidebar.tsx
 "use client";
 
 import { useState, useEffect } from "react";

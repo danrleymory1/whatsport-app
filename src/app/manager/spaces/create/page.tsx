@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
-import { CreateSpaceForm } from "@/app/components/manager/create-space-form";
+import { CreateSpaceForm } from "@/components/manager/create-space-form";
 import { useAuth } from "@/app/context/auth-context";
 import { UserType } from "@/types/user";
 import { redirect } from "next/navigation";

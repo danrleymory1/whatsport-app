@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
-import { PlayerReservations } from "@/app/components/player/reservations";
+import { PlayerReservations } from "@/components/player/reservations";
 import { useAuth } from "@/app/context/auth-context";
 import { UserType } from "@/types/user";
 import { redirect } from "next/navigation";

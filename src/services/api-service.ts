@@ -39,12 +39,12 @@ class ApiService {
   ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     
-    // Get token from both cookie and localStorage as fallback
+    // Obter token de ambas as fontes (cookie tem prioridade)
     const token = Cookies.get('accessToken') || localStorage.getItem('accessToken');
     
     const headers: HeadersInit = {};
     
-    // Always include token if available
+    // Adicionar token se disponível
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
       console.log(`Using token for ${endpoint}: ${token.substring(0, 15)}...`);
@@ -79,6 +79,21 @@ class ApiService {
       // Handle empty responses
       if (response.status === 204 || response.headers.get('content-length') === '0') {
         return {} as T;
+      }
+      
+      // Para status 401, tente reautenticar ou redirecionar para login
+      if (response.status === 401) {
+        // Remover tokens inválidos
+        Cookies.remove('accessToken');
+        localStorage.removeItem('accessToken');
+        
+        // Redirecionar para login se não for uma rota de autenticação
+        const isAuthEndpoint = endpoint.startsWith('/auth/');
+        if (!isAuthEndpoint && typeof window !== 'undefined') {
+          window.location.href = '/auth/sign-in';
+        }
+        
+        throw new Error('Not authenticated');
       }
       
       // Parse response

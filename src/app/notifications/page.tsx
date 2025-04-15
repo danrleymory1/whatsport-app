@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
-import { PlayerNotifications } from "@/app/components/player/notifications";
+import { PlayerNotifications } from "@/components/player/notifications";
 import { useAuth } from "@/app/context/auth-context";
 import { UserType } from "@/types/user";
 import { redirect } from "next/navigation";

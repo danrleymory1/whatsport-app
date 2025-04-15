@@ -1,3 +1,4 @@
+//src/components/layout/app-layout.tsx
 "use client";
 
 import { ReactNode, useState, useEffect } from "react";

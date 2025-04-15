@@ -171,7 +171,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Login function
   const login = async (token: string, email: string) => {
     try {
-      // Store token in both cookie and localStorage
+      // Store token in both cookie and localStorage with proper configuration
       Cookies.set('accessToken', token, {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
@@ -188,22 +188,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         error: null
       }));
       
+      // Aguardar um momento para garantir que o token seja salvo
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Get user data
       const success = await fetchUserData();
       
       if (success) {
+        // Atualize o token no apiService
+        await fetchUserData();
+        
         // Navigate based on user type
         const userType = authState.userType;
         
-        setTimeout(() => {
-          if (userType === UserType.PLAYER) {
-            router.push('/player');
-          } else if (userType === UserType.MANAGER) {
-            router.push('/manager');
-          } else {
-            router.push('/');
-          }
-        }, 100);
+        router.push(userType === UserType.PLAYER ? '/player' : '/manager');
       }
     } catch (error) {
       console.error("Login error:", error);
