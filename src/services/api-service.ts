@@ -100,7 +100,7 @@ class ApiService {
       throw error;
     }
   }
-  
+
   // Métodos de autenticação
   async register(data: RegisterPayload): Promise<ApiResponse<any>> {
     return this.request('/auth/sign-up', 'POST', data);
@@ -181,30 +181,75 @@ async getNearbyEvents(location: { lat: number, lng: number }, radius?: number): 
     return this.request(`/player/events/${eventId}/join`, 'POST');
   }
   
+  async getReservations(filters?: any): Promise<ApiResponse<any>> {
+    const queryParams = filters ? `?${new URLSearchParams(filters).toString()}` : '';
+    return this.request(`/player/reservations${queryParams}`);
+  }
+  
+  async getReservation(reservationId: string): Promise<ApiResponse<any>> {
+    return this.request(`/player/reservations/${reservationId}`);
+  }
+  
+  async createReservation(reservationData: any): Promise<ApiResponse<any>> {
+    return this.request('/player/reservations', 'POST', reservationData);
+  }
+  
+  async cancelReservation(reservationId: string): Promise<ApiResponse<any>> {
+    return this.request(`/player/reservations/${reservationId}/cancel`, 'POST');
+  }
+  
+  // Métodos para Espaços
+  async getPublicSpaces(filters?: any): Promise<ApiResponse<any>> {
+    const queryParams = filters ? `?${new URLSearchParams(filters).toString()}` : '';
+    return this.request(`/manager/spaces/public${queryParams}`);
+  }
+  
+  async getSpace(spaceId: string): Promise<ApiResponse<any>> {
+    return this.request(`/manager/spaces/${spaceId}`);
+  }
+
   // Métodos para gerentes de espaços
   async getSpaces(): Promise<ApiResponse<any>> {
     return this.request('/manager/spaces');
   }
-  
-  async createSpace(spaceData: any): Promise<ApiResponse<any>> {
-    return this.request('/manager/spaces', 'POST', spaceData);
-  }
-  
-  async updateSpace(spaceId: string, spaceData: any): Promise<ApiResponse<any>> {
-    return this.request(`/manager/spaces/${spaceId}`, 'PUT', spaceData);
-  }
-  
-  async getReservations(spaceId: string): Promise<ApiResponse<any>> {
-    return this.request(`/manager/spaces/${spaceId}/reservations`);
-  }
-  
-  async approveReservation(reservationId: string): Promise<ApiResponse<any>> {
-    return this.request(`/manager/reservations/${reservationId}/approve`, 'POST');
-  }
-  
-  async rejectReservation(reservationId: string): Promise<ApiResponse<any>> {
-    return this.request(`/manager/reservations/${reservationId}/reject`, 'POST');
-  }
+
+  // Métodos para gerenciamento de espaços
+async createSpace(spaceData: any): Promise<ApiResponse<any>> {
+  return this.request('/manager/spaces', 'POST', spaceData);
+}
+
+async updateSpace(spaceId: string, spaceData: any): Promise<ApiResponse<any>> {
+  return this.request(`/manager/spaces/${spaceId}`, 'PUT', spaceData);
+}
+
+async deleteSpace(spaceId: string): Promise<ApiResponse<any>> {
+  return this.request(`/manager/spaces/${spaceId}`, 'DELETE');
+}
+
+async addSpacePhoto(spaceId: string, photoData: { url: string, is_primary: boolean }): Promise<ApiResponse<any>> {
+  return this.request(`/manager/spaces/${spaceId}/photos`, 'POST', photoData);
+}
+
+async removeSpacePhoto(spaceId: string, photoId: string): Promise<ApiResponse<any>> {
+  return this.request(`/manager/spaces/${spaceId}/photos/${photoId}`, 'DELETE');
+}
+
+async getSpaceReservations(spaceId: string, filters?: any): Promise<ApiResponse<any>> {
+  const queryParams = filters ? `?${new URLSearchParams(filters).toString()}` : '';
+  return this.request(`/manager/reservations/space/${spaceId}${queryParams}`);
+}
+
+async approveReservation(reservationId: string): Promise<ApiResponse<any>> {
+  return this.request(`/manager/reservations/${reservationId}/approve`, 'POST');
+}
+
+async rejectReservation(reservationId: string, data: { rejection_reason: string }): Promise<ApiResponse<any>> {
+  return this.request(`/manager/reservations/${reservationId}/reject`, 'POST', data);
+}
+
+async completeReservation(reservationId: string): Promise<ApiResponse<any>> {
+  return this.request(`/manager/reservations/${reservationId}/complete`, 'POST');
+}
   
   async getCurrentUser(): Promise<ApiResponse<any>> {
     try {
