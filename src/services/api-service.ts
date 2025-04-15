@@ -161,9 +161,25 @@ class ApiService {
     return this.request('/users/me', 'PUT', profileData);
   }
   
-  async getNotifications(): Promise<ApiResponse<any>> {
-    return this.request('/users/notifications');
+  async getNotifications(params?: { 
+    unread_only?: boolean, 
+    page?: number, 
+    per_page?: number 
+  }): Promise<ApiResponse<any>> {
+    const queryParams = params 
+      ? `?${new URLSearchParams(params as any).toString()}` 
+      : '';
+    return this.request(`/users/notifications${queryParams}`);
   }
+
+  async markNotificationsAsRead(notificationIds: string[]): Promise<ApiResponse<any>> {
+    return this.request('/users/notifications/mark-as-read', 'POST', {
+      notification_ids: notificationIds
+    });
+  }
+  
 }
+
+
 
 export const apiService = new ApiService();

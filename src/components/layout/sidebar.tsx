@@ -8,6 +8,7 @@ import { useAuth } from "@/app/context/auth-context";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { NotificationIndicator } from "@/components/notification-indicator";
 import { useTheme } from "next-themes";
 import { 
   ChevronRight, 
@@ -127,6 +128,8 @@ export function Sidebar({ userType }: SidebarProps) {
           >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </Button>
+          <NotificationIndicator />
+
           
           <Button
             variant="destructive"
