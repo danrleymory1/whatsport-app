@@ -19,6 +19,46 @@ from ..schemas.event import (
 
 router = APIRouter(prefix="/player/events", tags=["player-events"])
 
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate distance between two points using Haversine formula."""
+    from math import sin, cos, sqrt, atan2, radians
+    
+    # Convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    
+    # Haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    radius = 6371  # Radius of earth in kilometers
+    
+    return radius * c
+
+def format_event_for_response(event_doc, distance=None):
+    """Format a MongoDB event document for API response."""
+    result = {
+        "id": str(event_doc["_id"]),
+    }
+    
+    # Add all fields except _id
+    for k, v in event_doc.items():
+        if k != "_id":
+            # Handle ObjectId conversion
+            if isinstance(v, ObjectId):
+                result[k] = str(v)
+            # Handle datetime conversion
+            elif isinstance(v, datetime):
+                result[k] = v.isoformat()
+            else:
+                result[k] = v
+    
+    # Add distance if provided
+    if distance is not None:
+        result["distance"] = round(distance, 2)  # Round to 2 decimal places
+        
+    return result
+
 # Listar eventos
 @router.get("", response_model=EventList)
 async def list_events(
@@ -569,9 +609,6 @@ async def get_nearby_events(
     db=Depends(get_database)
 ):
     try:
-        # Filtrar eventos próximos 
-        # Em produção, seria melhor usar índices geoespaciais do MongoDB
-
         # Buscar todos os eventos futuros
         now = datetime.utcnow()
         filter_query = {
@@ -589,6 +626,10 @@ async def get_nearby_events(
         events_with_distance = []
         async for doc in cursor:
             try:
+                # Verificar se o documento tem campos de localização
+                if not doc.get("location") or "lat" not in doc["location"] or "lng" not in doc["location"]:
+                    continue
+                    
                 # Calcular distância aproximada
                 event_lat = doc["location"]["lat"]
                 event_lng = doc["location"]["lng"]
@@ -636,21 +677,19 @@ async def get_nearby_events(
         end_idx = start_idx + per_page
         paginated_events = events_with_distance[start_idx:end_idx]
         
-        # Remover campo distance antes de retornar
-        events = []
-        for event in paginated_events:
-            distance = event.pop("distance", None)
-            events.append(event)
-        
+        # Format the response to match the expected EventList structure
         return {
-            "events": events,
+            "events": paginated_events,
             "total": total,
             "page": page,
             "per_page": per_page
         }
     except Exception as e:
         print(f"Error in get_nearby_events: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
+        # Return an empty result instead of throwing an error
+        return {
+            "events": [],
+            "total": 0,
+            "page": page,
+            "per_page": per_page
+        }

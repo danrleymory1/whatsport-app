@@ -47,18 +47,51 @@ export default function PlayerDashboard() {
         if (position) {
           setUserLocation(position);
           
-          // Get nearby events
-          const nearbyEventsResponse = await apiService.getNearbyEvents(position, 10);
-          setNearbyEvents(nearbyEventsResponse.data || []);
+          // Get nearby events with better error handling
+          try {
+            console.log("Fetching nearby events with position:", position);
+            const nearbyEventsResponse = await apiService.getNearbyEvents(position, 10);
+            console.log("Nearby events response:", nearbyEventsResponse);
+            
+            if (nearbyEventsResponse && nearbyEventsResponse.data && Array.isArray(nearbyEventsResponse.data.events)) {
+              setNearbyEvents(nearbyEventsResponse.data.events);
+            } else {
+              console.warn("Unexpected nearby events response structure:", nearbyEventsResponse);
+              setNearbyEvents([]);
+            }
+          } catch (error) {
+            console.error("Error fetching nearby events:", error);
+            setNearbyEvents([]);
+          }
         }
         
-        // Get user's upcoming events
-        const eventsResponse = await apiService.getEvents({ participant: true, upcoming: true });
-        setUpcomingEvents(eventsResponse.data || []);
+        // Get user's upcoming events with better error handling
+        try {
+          const eventsResponse = await apiService.getEvents({ participant: true, upcoming: true });
+          if (eventsResponse && eventsResponse.data && Array.isArray(eventsResponse.data.events)) {
+            setUpcomingEvents(eventsResponse.data.events);
+          } else {
+            console.warn("Unexpected user events response structure:", eventsResponse);
+            setUpcomingEvents([]);
+          }
+        } catch (error) {
+          console.error("Error fetching user events:", error);
+          setUpcomingEvents([]);
+        }
         
-        // Get all events for the map
-        const allEventsResponse = await apiService.getEvents({ upcoming: true });
-        setEvents(allEventsResponse.data || []);
+        // Get all events for the map with better error handling
+        try {
+          const allEventsResponse = await apiService.getEvents({ upcoming: true });
+          if (allEventsResponse && allEventsResponse.data && Array.isArray(allEventsResponse.data.events)) {
+            setEvents(allEventsResponse.data.events);
+          } else {
+            console.warn("Unexpected all events response structure:", allEventsResponse);
+            setEvents([]);
+          }
+        } catch (error) {
+          console.error("Error fetching all events:", error);
+          setEvents([]);
+        }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -68,7 +101,6 @@ export default function PlayerDashboard() {
     
     fetchData();
   }, []);
-  
   const handleEventClick = (event: Event) => {
     router.push(`/player/events/${event.id}`);
   };

@@ -158,20 +158,43 @@ class ApiService {
     return this.request(`/player/events${queryParams}`);
   }
   
-async getNearbyEvents(location: { lat: number, lng: number }, radius?: number): Promise<ApiResponse<any>> {
-  try {
-    const queryParams = new URLSearchParams({
-      lat: location.lat.toString(),
-      lng: location.lng.toString(),
-      radius: (radius || 10).toString()
-    });
-    
-    return this.request(`/player/events/nearby?${queryParams.toString()}`);
-  } catch (error) {
-    console.error("Error fetching nearby events:", error);
-    return { data: { events: [], total: 0, page: 1, per_page: 10 } };
+  async getNearbyEvents(location: { lat: number, lng: number }, radius?: number): Promise<ApiResponse<any>> {
+    try {
+      const queryParams = new URLSearchParams({
+        lat: location.lat.toString(),
+        lng: location.lng.toString(),
+        radius: (radius || 10).toString()
+      });
+      
+      try {
+        // The actual API endpoint call
+        const response = await this.request<ApiResponse<any>>(`/player/events/nearby?${queryParams.toString()}`);
+        return response;
+      } catch (apiError) {
+        console.error("API Error fetching nearby events:", apiError);
+        // Return properly structured empty data on API error
+        return { 
+          data: { 
+            events: [], 
+            total: 0, 
+            page: 1, 
+            per_page: 10 
+          } 
+        };
+      }
+    } catch (error) {
+      console.error("Error in getNearbyEvents:", error);
+      // Return properly structured empty data on any error
+      return { 
+        data: { 
+          events: [], 
+          total: 0, 
+          page: 1, 
+          per_page: 10 
+        } 
+      };
+    }
   }
-}
   
   async createEvent(eventData: any): Promise<ApiResponse<any>> {
     return this.request('/player/events', 'POST', eventData);
