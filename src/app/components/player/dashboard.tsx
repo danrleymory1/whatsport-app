@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/app/context/auth-context";
-import { apiService } from "@/services/api-service";
+import { eventsService } from "@/services/events-service";
 import { mapService } from "@/services/map-service";
 import { Event } from "@/types/event";
 import LeafletMap from "@/components/map/leaflet-map";
@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function PlayerDashboard() {
   const { user, userEmail } = useAuth();
@@ -47,53 +48,23 @@ export default function PlayerDashboard() {
         if (position) {
           setUserLocation(position);
           
-          // Get nearby events with better error handling
-          try {
-            console.log("Fetching nearby events with position:", position);
-            const nearbyEventsResponse = await apiService.getNearbyEvents(position, 10);
-            console.log("Nearby events response:", nearbyEventsResponse);
-            
-            if (nearbyEventsResponse && nearbyEventsResponse.data && Array.isArray(nearbyEventsResponse.data.events)) {
-              setNearbyEvents(nearbyEventsResponse.data.events);
-            } else {
-              console.warn("Unexpected nearby events response structure:", nearbyEventsResponse);
-              setNearbyEvents([]);
-            }
-          } catch (error) {
-            console.error("Error fetching nearby events:", error);
-            setNearbyEvents([]);
-          }
+          // Get nearby events
+          const nearbyEventsData = await eventsService.getNearbyEvents(position, 10);
+          setNearbyEvents(nearbyEventsData);
         }
         
-        // Get user's upcoming events with better error handling
-        try {
-          const eventsResponse = await apiService.getEvents({ participant: true, upcoming: true });
-          if (eventsResponse && eventsResponse.data && Array.isArray(eventsResponse.data.events)) {
-            setUpcomingEvents(eventsResponse.data.events);
-          } else {
-            console.warn("Unexpected user events response structure:", eventsResponse);
-            setUpcomingEvents([]);
-          }
-        } catch (error) {
-          console.error("Error fetching user events:", error);
-          setUpcomingEvents([]);
-        }
+        // Get user's upcoming events
+        const upcomingEventsData = await eventsService.getEvents({ participant: true, upcoming: true });
+        setUpcomingEvents(upcomingEventsData);
         
-        // Get all events for the map with better error handling
-        try {
-          const allEventsResponse = await apiService.getEvents({ upcoming: true });
-          if (allEventsResponse && allEventsResponse.data && Array.isArray(allEventsResponse.data.events)) {
-            setEvents(allEventsResponse.data.events);
-          } else {
-            console.warn("Unexpected all events response structure:", allEventsResponse);
-            setEvents([]);
-          }
-        } catch (error) {
-          console.error("Error fetching all events:", error);
-          setEvents([]);
-        }
+        // Get all events for the map
+        const allEventsData = await eventsService.getEvents({ upcoming: true });
+        setEvents(allEventsData);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
+        toast.error("Erro ao carregar dados do dashboard", {
+          description: "Tente novamente mais tarde."
+        });
       } finally {
         setLoading(false);
       }
@@ -101,8 +72,47 @@ export default function PlayerDashboard() {
     
     fetchData();
   }, []);
+  
   const handleEventClick = (event: Event) => {
     router.push(`/player/events/${event.id}`);
+  };
+  
+  const refreshNearbyEvents = async () => {
+    if (!userLocation) return;
+    
+    try {
+      const nearbyEventsData = await eventsService.getNearbyEvents(userLocation, 10);
+      setNearbyEvents(nearbyEventsData);
+      toast.success("Eventos próximos atualizados");
+    } catch (error) {
+      console.error("Error refreshing nearby events:", error);
+      toast.error("Erro ao atualizar eventos próximos");
+    }
+  };
+  
+  const refreshUpcomingEvents = async () => {
+    try {
+      const upcomingEventsData = await eventsService.getEvents({ participant: true, upcoming: true });
+      setUpcomingEvents(upcomingEventsData);
+      toast.success("Seus eventos atualizados");
+    } catch (error) {
+      console.error("Error refreshing upcoming events:", error);
+      toast.error("Erro ao atualizar seus eventos");
+    }
+  };
+  
+  const activateLocation = async () => {
+    try {
+      const position = await mapService.getCurrentPosition();
+      if (position) {
+        setUserLocation(position);
+        const nearbyEventsData = await eventsService.getNearbyEvents(position, 10);
+        setNearbyEvents(nearbyEventsData);
+      }
+    } catch (error) {
+      console.error("Error getting user location:", error);
+      toast.error("Não foi possível obter sua localização");
+    }
   };
   
   return (
@@ -155,12 +165,7 @@ export default function PlayerDashboard() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => {
-                  // Refresh upcoming events
-                  apiService.getEvents({ participant: true, upcoming: true }).then((res) => {
-                    setUpcomingEvents(res.data || []);
-                  });
-                }}
+                onClick={refreshUpcomingEvents}
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
@@ -180,7 +185,7 @@ export default function PlayerDashboard() {
                   Você não tem eventos agendados.
                 </p>
                 <Button className="mt-4" asChild>
-                  <Link href="/player/events/nearby">Encontrar eventos</Link>
+                  <Link href="/player/events/create">Criar evento</Link>
                 </Button>
               </div>
             ) : (
@@ -188,7 +193,8 @@ export default function PlayerDashboard() {
                 {upcomingEvents.slice(0, 3).map((event) => (
                   <div
                     key={event.id}
-                    className="flex items-start p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    className="flex items-start p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => handleEventClick(event)}
                   >
                     <div className="flex-shrink-0 p-2 bg-primary/10 rounded-md">
                       <Calendar className="h-5 w-5 text-primary" />
@@ -208,12 +214,9 @@ export default function PlayerDashboard() {
                       </div>
                       <div className="flex items-center text-sm text-muted-foreground">
                         <MapPin className="h-3 w-3 mr-1" />
-                        <span>{event.location.address || 'Localização não definida'}</span>
+                        <span>{event.location?.address || 'Localização não definida'}</span>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/player/events/${event.id}`}>Detalhes</Link>
-                    </Button>
                   </div>
                 ))}
                 {upcomingEvents.length > 3 && (
@@ -234,14 +237,8 @@ export default function PlayerDashboard() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => {
-                  // Refresh nearby events if location is available
-                  if (userLocation) {
-                    apiService.getNearbyEvents(userLocation, 10).then((res) => {
-                      setNearbyEvents(res.data || []);
-                    });
-                  }
-                }}
+                onClick={refreshNearbyEvents}
+                disabled={!userLocation}
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
@@ -260,14 +257,7 @@ export default function PlayerDashboard() {
                 <p className="text-muted-foreground">
                   Permita o acesso à localização para ver eventos próximos.
                 </p>
-                <Button className="mt-4" onClick={() => mapService.getCurrentPosition().then(pos => {
-                  if (pos) {
-                    setUserLocation(pos);
-                    apiService.getNearbyEvents(pos, 10).then((res) => {
-                      setNearbyEvents(res.data || []);
-                    });
-                  }
-                })}>
+                <Button className="mt-4" onClick={activateLocation}>
                   Ativar localização
                 </Button>
               </div>
@@ -285,7 +275,8 @@ export default function PlayerDashboard() {
                 {nearbyEvents.slice(0, 3).map((event) => (
                   <div
                     key={event.id}
-                    className="flex items-start p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    className="flex items-start p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => handleEventClick(event)}
                   >
                     <div className="flex-shrink-0 p-2 bg-primary/10 rounded-md">
                       <Trophy className="h-5 w-5 text-primary" />
@@ -298,7 +289,7 @@ export default function PlayerDashboard() {
                       <div className="flex items-center text-sm text-muted-foreground mt-1">
                         <Users className="h-3 w-3 mr-1" />
                         <span>
-                          {event.participants.length}/{event.max_participants} participantes
+                          {event.participants?.length || 0}/{event.max_participants} participantes
                         </span>
                       </div>
                       <div className="flex items-center text-sm text-muted-foreground">
@@ -313,9 +304,6 @@ export default function PlayerDashboard() {
                         </span>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/player/events/${event.id}`}>Detalhes</Link>
-                    </Button>
                   </div>
                 ))}
                 {nearbyEvents.length > 3 && (
@@ -365,7 +353,7 @@ export default function PlayerDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {[...new Set(upcomingEvents.map(e => e.sport_type))].length}
+              {[...new Set(upcomingEvents.map(e => e.sport_type || ''))].filter(Boolean).length}
             </div>
             <p className="text-xs text-muted-foreground">
               Esportes em que você participa

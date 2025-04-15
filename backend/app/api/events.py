@@ -597,7 +597,6 @@ async def leave_event(
         "message": "Você saiu do evento com sucesso!"
     }
 
-# Obter eventos próximos (baseado na localização)
 @router.get("/nearby", response_model=EventList)
 async def get_nearby_events(
     lat: float = Query(..., description="Latitude"),
@@ -609,6 +608,9 @@ async def get_nearby_events(
     db=Depends(get_database)
 ):
     try:
+        # Filtrar eventos próximos 
+        # Em produção, seria melhor usar índices geoespaciais do MongoDB
+
         # Buscar todos os eventos futuros
         now = datetime.utcnow()
         filter_query = {
@@ -626,10 +628,10 @@ async def get_nearby_events(
         events_with_distance = []
         async for doc in cursor:
             try:
-                # Verificar se o documento tem campos de localização
-                if not doc.get("location") or "lat" not in doc["location"] or "lng" not in doc["location"]:
+                # Verificar se o documento possui os campos necessários
+                if "location" not in doc or "lat" not in doc["location"] or "lng" not in doc["location"]:
                     continue
-                    
+                
                 # Calcular distância aproximada
                 event_lat = doc["location"]["lat"]
                 event_lng = doc["location"]["lng"]
@@ -665,28 +667,38 @@ async def get_nearby_events(
                                 
                     events_with_distance.append(event_data)
             except Exception as e:
-                print(f"Error processing event: {e}")
+                # Log error but continue processing other events
+                print(f"Error processing event document: {e}")
                 continue
         
         # Ordenar por distância
-        events_with_distance.sort(key=lambda e: e["distance"])
+        events_with_distance.sort(key=lambda e: e.get("distance", float('inf')))
         
         # Paginação manual
         total = len(events_with_distance)
         start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
+        end_idx = min(start_idx + per_page, total)
         paginated_events = events_with_distance[start_idx:end_idx]
         
-        # Format the response to match the expected EventList structure
+        # Remover campo distance antes de retornar
+        events = []
+        for event in paginated_events:
+            event.pop("distance", None)
+            events.append(event)
+        
         return {
-            "events": paginated_events,
+            "events": events,
             "total": total,
             "page": page,
             "per_page": per_page
         }
     except Exception as e:
-        print(f"Error in get_nearby_events: {str(e)}")
-        # Return an empty result instead of throwing an error
+        # Log detalhado do erro para depuração
+        import traceback
+        error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        print(f"Error in get_nearby_events: {error_detail}")
+        
+        # Retornar uma resposta vazia em vez de erro
         return {
             "events": [],
             "total": 0,

@@ -101,6 +101,51 @@ class ApiService {
     }
   }
 
+  private normalizeEventsResponse(response: any): { events: any[], total: number, page: number, per_page: number } {
+    // Se a resposta já estiver no formato esperado
+    if (response && response.events !== undefined && Array.isArray(response.events)) {
+      return {
+        events: response.events,
+        total: response.total || response.events.length,
+        page: response.page || 1,
+        per_page: response.per_page || 10
+      };
+    }
+    
+    // Se a resposta for diretamente um array de eventos
+    if (response && Array.isArray(response)) {
+      return {
+        events: response,
+        total: response.length,
+        page: 1,
+        per_page: response.length
+      };
+    }
+    
+    // Se a resposta estiver em algum outro formato, tenta encontrar a lista de eventos
+    if (response && typeof response === 'object') {
+      // Procura por uma propriedade que seja um array
+      for (const key in response) {
+        if (Array.isArray(response[key])) {
+          return {
+            events: response[key],
+            total: response.total || response[key].length,
+            page: response.page || 1,
+            per_page: response.per_page || 10
+          };
+        }
+      }
+    }
+    
+    // Se nada for encontrado, retorna uma lista vazia
+    return {
+      events: [],
+      total: 0,
+      page: 1,
+      per_page: 10
+    };
+  }
+
   // Métodos de autenticação
   async register(data: RegisterPayload): Promise<ApiResponse<any>> {
     return this.request('/auth/sign-up', 'POST', data);
@@ -152,10 +197,20 @@ class ApiService {
     return this.request('/auth/logout', 'POST');
   }
   
-  // Métodos para jogadores
   async getEvents(filters?: any): Promise<ApiResponse<any>> {
     const queryParams = filters ? `?${new URLSearchParams(filters).toString()}` : '';
-    return this.request(`/player/events${queryParams}`);
+    try {
+      const response = await this.request<{data?: any}>(`/player/events${queryParams}`);
+      return { 
+        data: this.normalizeEventsResponse(response.data || response as any)
+      };
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      return { 
+        data: this.normalizeEventsResponse([]),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
   
   async getNearbyEvents(location: { lat: number, lng: number }, radius?: number): Promise<ApiResponse<any>> {
@@ -166,39 +221,23 @@ class ApiService {
         radius: (radius || 10).toString()
       });
       
-      try {
-        // The actual API endpoint call
-        const response = await this.request<ApiResponse<any>>(`/player/events/nearby?${queryParams.toString()}`);
-        return response;
-      } catch (apiError) {
-        console.error("API Error fetching nearby events:", apiError);
-        // Return properly structured empty data on API error
-        return { 
-          data: { 
-            events: [], 
-            total: 0, 
-            page: 1, 
-            per_page: 10 
-          } 
-        };
-      }
-    } catch (error) {
-      console.error("Error in getNearbyEvents:", error);
-      // Return properly structured empty data on any error
+      const response = await this.request<{data?: any}>(`/player/events/nearby?${queryParams.toString()}`);
       return { 
-        data: { 
-          events: [], 
-          total: 0, 
-          page: 1, 
-          per_page: 10 
-        } 
+        data: this.normalizeEventsResponse(response.data || response as any)
+      };
+    } catch (error) {
+      console.error("API Error fetching nearby events:", error);
+      return { 
+        data: this.normalizeEventsResponse([]),
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
-  
+
   async createEvent(eventData: any): Promise<ApiResponse<any>> {
     return this.request('/player/events', 'POST', eventData);
   }
+
   
   async joinEvent(eventId: string): Promise<ApiResponse<any>> {
     return this.request(`/player/events/${eventId}/join`, 'POST');

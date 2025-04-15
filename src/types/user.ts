@@ -10,6 +10,10 @@ export enum UserType {
     user_type: UserType;
     name?: string;
     profile_image?: string;
+    phone?: string;
+    address?: string; 
+    birth_date?: string;
+    bio?: string;
     created_at: string;
     updated_at: string;
   }
