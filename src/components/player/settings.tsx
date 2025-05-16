@@ -2,9 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { NotificationSettings } from "./notification-settings";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -15,11 +13,11 @@ import { toast } from "sonner";
 export function UserSettings() {
   const [saving, setSaving] = useState(false);
 
-  const handleSaveProfile = async () => {
+  const handleSaveSettings = async () => {
     setSaving(true);
     
     try {
-      // This would be an API call to save profile settings
+      // Simulação de uma chamada API para salvar as configurações
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       toast.success("Configurações salvas com sucesso");
@@ -35,154 +33,113 @@ export function UserSettings() {
     <div className="container mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold mb-6">Configurações</h1>
       
-      <Tabs defaultValue="account">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
-          <TabsTrigger value="account">Conta</TabsTrigger>
-          <TabsTrigger value="notifications">Notificações</TabsTrigger>
-          <TabsTrigger value="privacy">Privacidade</TabsTrigger>
-        </TabsList>
+      <Card>
+        <CardHeader>
+          <CardTitle>Preferências do Aplicativo</CardTitle>
+          <CardDescription>
+            Gerencie suas preferências e configurações
+          </CardDescription>
+        </CardHeader>
         
-        {/* Account Settings */}
-        <TabsContent value="account">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configurações da Conta</CardTitle>
-              <CardDescription>
-                Gerencie suas informações de conta e preferências
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="displayName">Nome de exibição</Label>
-                    <Input id="displayName" defaultValue="Usuário WhatsPort" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Nome de usuário</Label>
-                    <Input id="username" defaultValue="usuario" />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" defaultValue="usuario@example.com" disabled />
-                  <p className="text-sm text-muted-foreground">
-                    Para alterar seu email, entre em contato com o suporte.
-                  </p>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="language">Idioma</Label>
-                  <Select defaultValue="pt-BR">
-                    <SelectTrigger id="language">
-                      <SelectValue placeholder="Selecione um idioma" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
-                      <SelectItem value="en-US">English (US)</SelectItem>
-                      <SelectItem value="es">Español</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="marketing-emails">Emails de marketing</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receba ofertas e novidades sobre o WhatsPort
-                    </p>
-                  </div>
-                  <Switch id="marketing-emails" defaultChecked={true} />
-                </div>
+        <CardContent className="space-y-6">
+          {/* Configurações de Idioma */}
+          <div className="space-y-2">
+            <Label htmlFor="language">Idioma</Label>
+            <Select defaultValue="pt-BR">
+              <SelectTrigger id="language">
+                <SelectValue placeholder="Selecione um idioma" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
+                <SelectItem value="en-US">English (US)</SelectItem>
+                <SelectItem value="es">Español</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Configurações de Tema */}
+          <div className="space-y-2">
+            <Label htmlFor="theme">Tema</Label>
+            <Select defaultValue="system">
+              <SelectTrigger id="theme">
+                <SelectValue placeholder="Selecione um tema" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">Claro</SelectItem>
+                <SelectItem value="dark">Escuro</SelectItem>
+                <SelectItem value="system">Sistema</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Configurações de Notificações Simplificadas */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Notificações</h3>
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="email-notifications" className="font-medium">Notificações por Email</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receba notificações por email
+                </p>
               </div>
-              
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline">Cancelar</Button>
-                <Button onClick={handleSaveProfile} disabled={saving}>
-                  {saving ? "Salvando..." : "Salvar Alterações"}
-                </Button>
+              <Switch id="email-notifications" defaultChecked={true} />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="push-notifications" className="font-medium">Notificações Push</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receba notificações no navegador e no aplicativo
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <Switch id="push-notifications" defaultChecked={true} />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="event-notifications" className="font-medium">Notificações de Eventos</Label>
+                <p className="text-sm text-muted-foreground">
+                  Notificações sobre eventos e convites
+                </p>
+              </div>
+              <Switch id="event-notifications" defaultChecked={true} />
+            </div>
+          </div>
+          
+          {/* Configurações Gerais */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Configurações Gerais</h3>
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="location-sharing" className="font-medium">Compartilhamento de Localização</Label>
+                <p className="text-sm text-muted-foreground">
+                  Permite que o aplicativo acesse sua localização
+                </p>
+              </div>
+              <Switch id="location-sharing" defaultChecked={true} />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="marketing-emails" className="font-medium">Emails promocionais</Label>
+                <p className="text-sm text-muted-foreground">
+                  Receba ofertas e novidades sobre o WhatsPort
+                </p>
+              </div>
+              <Switch id="marketing-emails" defaultChecked={true} />
+            </div>
+          </div>
+        </CardContent>
         
-        {/* Notification Settings */}
-        <TabsContent value="notifications">
-          <NotificationSettings />
-        </TabsContent>
-        
-        {/* Privacy Settings */}
-        <TabsContent value="privacy">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configurações de Privacidade</CardTitle>
-              <CardDescription>
-                Gerencie suas configurações de privacidade e visibilidade
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="profile-visibility">Visibilidade do perfil</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Quem pode ver seu perfil no WhatsPort
-                    </p>
-                  </div>
-                  <Select defaultValue="friends">
-                    <SelectTrigger id="profile-visibility" className="w-[180px]">
-                      <SelectValue placeholder="Selecione a visibilidade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="public">Público</SelectItem>
-                      <SelectItem value="friends">Apenas amigos</SelectItem>
-                      <SelectItem value="private">Privado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="location-sharing">Compartilhamento de localização</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Permite que outros usuários vejam sua localização durante eventos
-                    </p>
-                  </div>
-                  <Switch id="location-sharing" defaultChecked={true} />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="activity-status">Status de atividade</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Mostrar quando você está online
-                    </p>
-                  </div>
-                  <Switch id="activity-status" defaultChecked={true} />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="data-collection">Coleta de dados de uso</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Permite a coleta de dados para melhorar a experiência
-                    </p>
-                  </div>
-                  <Switch id="data-collection" defaultChecked={true} />
-                </div>
-              </div>
-              
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline">Cancelar</Button>
-                <Button onClick={handleSaveProfile} disabled={saving}>
-                  {saving ? "Salvando..." : "Salvar Alterações"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        <CardFooter className="flex justify-end space-x-2">
+          <Button variant="outline">Restaurar Padrões</Button>
+          <Button onClick={handleSaveSettings} disabled={saving}>
+            {saving ? "Salvando..." : "Salvar Configurações"}
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }
