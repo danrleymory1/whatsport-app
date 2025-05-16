@@ -32,6 +32,7 @@ export interface User {
   email: string;
   user_type: UserType;
   name?: string;
+  username?: string; // Novo campo para username único
   profile_image?: string;
   phone?: string;
   address?: string;

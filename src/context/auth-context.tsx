@@ -1,3 +1,4 @@
+// File: src/context/auth-context.tsx
 "use client";
 
 import {
@@ -17,7 +18,7 @@ import {
     confirmPasswordReset,
     updateProfile as firebaseUpdateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { User, UserType } from '@/types/user';
 import { toast } from 'sonner';
@@ -34,7 +35,7 @@ interface AuthState {
 interface AuthContextProps extends AuthState {
     login: (email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
-    signup: (email: string, password: string, userType: UserType) => Promise<boolean>;
+    signup: (email: string, password: string, userType: UserType, profileData?: { name?: string; username?: string }) => Promise<boolean>;
     refreshUserData: () => Promise<void>;
     updateProfile: (profileData: Partial<User>) => Promise<boolean>;
     resetPassword: (token: string, password: string) => Promise<boolean>;
@@ -164,19 +165,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     // Signup function
-    const signup = async (email: string, password: string, userType: UserType): Promise<boolean> => {
+    const signup = async (
+        email: string, 
+        password: string, 
+        userType: UserType, 
+        profileData?: { name?: string; username?: string }
+    ): Promise<boolean> => {
         try {
             setAuthState(prev => ({ ...prev, loading: true, error: null }));
+
+            // Check if username is unique (if provided)
+            if (profileData?.username) {
+                const usernameQuery = query(
+                    collection(db, 'users'),
+                    where('username', '==', profileData.username)
+                );
+                const usernameSnapshot = await getDocs(usernameQuery);
+                
+                if (!usernameSnapshot.empty) {
+                    throw new Error('Este username já está em uso');
+                }
+            }
 
             // Create user in Firebase Auth
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const firebaseUser = userCredential.user;
+
+            // Update Firebase Auth profile with display name if provided
+            if (profileData?.name) {
+                await firebaseUpdateProfile(firebaseUser, {
+                    displayName: profileData.name
+                });
+            }
 
             // Create user document in Firestore
             const newUser: User = {
                 id: firebaseUser.uid,
                 email: email,
                 user_type: userType,
+                name: profileData?.name || '',
+                username: profileData?.username || '',
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
             };
@@ -185,10 +213,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
             await setDoc(userDocRef, newUser);
 
             setAuthState(prev => ({ ...prev, loading: false }));
-
-            toast.success("Cadastro realizado com sucesso!", {
-                description: "Agora você pode fazer login com suas credenciais."
-            });
 
             return true;
         } catch (error) {
@@ -204,6 +228,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     errorMessage = 'Email inválido';
                 } else if (authError.code === 'auth/weak-password') {
                     errorMessage = 'Senha muito fraca';
+                } else {
+                    errorMessage = authError.message;
                 }
             }
 
@@ -254,6 +280,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!auth.currentUser || !authState.user) return false;
 
         try {
+            // Check if username is being updated and is unique
+            if (profileData.username && profileData.username !== authState.user.username) {
+                const usernameQuery = query(
+                    collection(db, 'users'),
+                    where('username', '==', profileData.username)
+                );
+                const usernameSnapshot = await getDocs(usernameQuery);
+                
+                if (!usernameSnapshot.empty) {
+                    toast.error("Este username já está em uso");
+                    return false;
+                }
+            }
+
             // Update display name in Firebase Auth if name is being updated
             if (profileData.name) {
                 await firebaseUpdateProfile(auth.currentUser, {

@@ -16,9 +16,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/auth-context";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, Loader2 } from "lucide-react";
 
 const signInSchema = z.object({
   email: z.string().email({ message: "Insira um e-mail válido." }),
@@ -30,9 +30,11 @@ type SignInFormData = z.infer<typeof signInSchema>;
 export function SignInForm() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const { login, error: authError } = useAuth();
+  const { login, error: authError, isAuthenticated, userType } = useAuth();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
+  // Inicializando o formulário corretamente
   const form = useForm<SignInFormData>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -40,6 +42,31 @@ export function SignInForm() {
       password: "",
     },
   });
+
+  // Redirect based on user type when authenticated
+  useEffect(() => {
+    if (isAuthenticated && userType) {
+      // Verificar se há uma URL de retorno nos parâmetros de consulta
+      const returnUrl = searchParams.get('returnUrl');
+      
+      // Add a small delay to ensure Firebase auth state is fully processed
+      const redirectTimer = setTimeout(() => {
+        if (returnUrl) {
+          // Redirecionar para a URL de retorno se existir
+          router.push(returnUrl);
+        } else {
+          // Redirecionar para o dashboard apropriado
+          if (userType === "jogador") {
+            router.push("/player/dashboard");
+          } else if (userType === "gerente") {
+            router.push("/manager/dashboard");
+          }
+        }
+      }, 300);
+      
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [isAuthenticated, userType, router, searchParams]);
 
   // Check for registration success message
   useEffect(() => {
@@ -56,9 +83,8 @@ export function SignInForm() {
 
     try {
       await login(data.email, data.password);
-      // Navigation happens in the auth context when login is successful
+      // Redirection will be handled by the useEffect above
     } catch (err) {
-      // Error handling is done in the auth context
       console.error("Login submission error:", err);
     } finally {
       setLoading(false);
@@ -113,10 +139,17 @@ export function SignInForm() {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Entrando..." : "Entrar"}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Entrando...
+                </>
+              ) : (
+                "Entrar"
+              )}
             </Button>
 
-            {authError && <p className="text-red-500 text-sm">{authError}</p>}
+            {authError && <p className="text-red-500 text-sm mt-2">{authError}</p>}
 
             <div className="text-sm text-center">
               Não tem uma conta?{" "}

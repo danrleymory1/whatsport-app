@@ -1,6 +1,7 @@
+// src/services/google-maps-service.ts
 import { Location } from '@/types/event';
 
-// --- Tipos (sem alterações) ---
+// Tipos para geocodificação
 interface GeocodingResult {
     formatted_address: string;
     geometry: {
@@ -22,7 +23,6 @@ interface GeocodingResponse {
     results: GeocodingResult[];
     status: string;
 }
-// --- Fim dos Tipos ---
 
 // Variáveis de nível de módulo para garantir o carregamento único
 let loadingPromise: Promise<void> | null = null;
@@ -69,15 +69,6 @@ class GoogleMapsService {
             // Verifica se o script já existe no DOM (segurança adicional)
             if (document.getElementById(scriptId)) {
                 console.warn("Script do Google Maps já existe no DOM, mas 'window.google.maps' não está pronto. Aguardando carregamento existente...");
-                // A lógica da Promise existente (onload/onerror) deve lidar com isso.
-                // Não iniciamos um novo carregamento.
-                // É importante que o script existente tenha os mesmos listeners ou que
-                // esta Promise consiga detectar o carregamento de alguma forma.
-                // No entanto, confiar no 'onload' do script que VAMOS criar é mais seguro.
-                // Se o script já existe E window.google.maps não está pronto, pode indicar um problema.
-                // Poderíamos tentar remover o script existente e adicionar o nosso, mas isso pode ser arriscado.
-                // Por simplicidade, vamos assumir que se o script existe, ele vai carregar ou já falhou.
-                // A Promise será resolvida/rejeitada pelo 'onload'/'onerror' abaixo.
             }
 
             console.log("Iniciando carregamento do script da API do Google Maps...");
@@ -123,7 +114,7 @@ class GoogleMapsService {
             await this.loadMapsApi(); // Garante que a API esteja carregada
 
             const response = await fetch(
-                `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${this.apiKey}&language=pt-BR` // Adiciona language
+                `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${this.apiKey}&language=pt-BR`
             );
 
             if (!response.ok) {
@@ -211,9 +202,6 @@ class GoogleMapsService {
         }
     }
 
-
-    // --- Métodos calculateDistance, calculateHaversineDistance, deg2rad ---
-    // (Sem alterações necessárias na lógica interna, pois já usam loadMapsApi)
     /**
      * Calcula a distância entre dois pontos usando a API do Google Maps.
      * Se a API não estiver disponível, usa a fórmula de Haversine como fallback.
@@ -245,12 +233,36 @@ class GoogleMapsService {
             }
 
             return new Promise((resolve, reject) => {
-                const service = new google.maps.DistanceMatrixService();
+                // Garantir que o objeto google.maps existe
+                if (!window.google || !window.google.maps) {
+                    this.calculateHaversineDistance(originCoords, destCoords)
+                        .then(resolve)
+                        .catch(reject);
+                    return;
+                }
+
+                const service = new window.google.maps.DistanceMatrixService();
+                
+                // Criando variáveis para evitar erros de undefined
+                let originLatLng;
+                if (typeof originCoords === 'string') {
+                    originLatLng = originCoords;
+                } else {
+                    originLatLng = new window.google.maps.LatLng(originCoords.lat, originCoords.lng);
+                }
+                
+                let destLatLng;
+                if (typeof destCoords === 'string') {
+                    destLatLng = destCoords;
+                } else {
+                    destLatLng = new window.google.maps.LatLng(destCoords.lat, destCoords.lng);
+                }
+                
                 service.getDistanceMatrix(
                     {
-                        origins: [typeof originCoords === 'string' ? originCoords : new google.maps.LatLng(originCoords.lat, originCoords.lng)],
-                        destinations: [typeof destCoords === 'string' ? destCoords : new google.maps.LatLng(destCoords.lat, destCoords.lng)],
-                        travelMode: google.maps.TravelMode.DRIVING,
+                        origins: [originLatLng],
+                        destinations: [destLatLng],
+                        travelMode: window.google.maps.TravelMode.DRIVING,
                     },
                     (response, status) => {
                         if (status === 'OK' && response?.rows[0]?.elements[0]?.status === 'OK') {
@@ -311,7 +323,6 @@ class GoogleMapsService {
     }
     private deg2rad(deg: number): number { return deg * (Math.PI / 180); }
 
-
     /**
      * Obtém a posição atual do usuário usando a API de Geolocalização do navegador.
      * Não depende diretamente da API do Google Maps, mas é frequentemente usada em conjunto.
@@ -343,107 +354,98 @@ class GoogleMapsService {
         });
     }
 
-    // --- Método searchNearbyPlaces ---
-    // (Sem alterações necessárias na lógica interna, pois já usa loadMapsApi)
-    async searchNearbyPlaces(/* ... */): Promise<any[]> { /* ... */ return [] }
-
-    // Add these methods to your src/services/google-maps-service.ts file
-
-// Add these methods to your src/services/google-maps-service.ts file
-
-  /**
-   * Searches for an address using the Geocoding API
-   * @param address The address to search for
-   * @returns An array of address results
-   */
-  async searchAddress(address: string): Promise<any[]> {
-    if (!address.trim()) return [];
-    
-    try {
-      await this.loadMapsApi(); // Ensure the API is loaded
-      
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${this.apiKey}&language=pt-BR`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Geocoding request failed: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.status !== 'OK' || !data.results.length) {
-        // Return empty array if no results found
-        return [];
-      }
-      
-      // Transform the response to a format more suitable for our UI
-      return data.results.map((result: any) => ({
-        address: {
-          freeformAddress: result.formatted_address,
-          countrySubdivision: result.address_components.find((c: any) => 
-            c.types.includes('administrative_area_level_1')
-          )?.short_name || null
-        },
-        position: {
-          lat: result.geometry.location.lat,
-          lon: result.geometry.location.lng
-        },
-        id: result.place_id
-      }));
-    } catch (error) {
-      console.error('Error searching address:', error);
-      return [];
+    /**
+     * Searches for an address using the Geocoding API
+     * @param address The address to search for
+     * @returns An array of address results
+     */
+    async searchAddress(address: string): Promise<any[]> {
+        if (!address.trim()) return [];
+        
+        try {
+            await this.loadMapsApi(); // Ensure the API is loaded
+            
+            const response = await fetch(
+                `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${this.apiKey}&language=pt-BR`
+            );
+            
+            if (!response.ok) {
+                throw new Error(`Geocoding request failed: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.status !== 'OK' || !data.results.length) {
+                // Return empty array if no results found
+                return [];
+            }
+            
+            // Transform the response to a format more suitable for our UI
+            return data.results.map((result: any) => ({
+                address: {
+                    freeformAddress: result.formatted_address,
+                    countrySubdivision: result.address_components.find((c: any) => 
+                        c.types.includes('administrative_area_level_1')
+                    )?.short_name || null
+                },
+                position: {
+                    lat: result.geometry.location.lat,
+                    lon: result.geometry.location.lng
+                },
+                id: result.place_id
+            }));
+        } catch (error) {
+            console.error('Error searching address:', error);
+            return [];
+        }
     }
-  }
   
-  /**
-   * Converts a geocoding result to our Location type
-   * @param result The geocoding result to convert
-   * @returns A Location object
-   */
-  toLocation(result: any): { address: string; city?: string; state?: string; postal_code?: string; lat: number; lng: number } {
-    try {
-      // Extract the components from the result
-      const location = {
-        address: result.address.freeformAddress,
-        lat: result.position.lat,
-        lng: result.position.lon
-      } as { 
-        address: string; 
-        city?: string; 
-        state?: string; 
-        postal_code?: string; 
-        lat: number; 
-        lng: number 
-      };
-      
-      // If there are address components in the result, extract them
-      if (result.address) {
-        if (result.address.municipality) {
-          location.city = result.address.municipality;
+    /**
+     * Converts a geocoding result to our Location type
+     * @param result The geocoding result to convert
+     * @returns A Location object
+     */
+    toLocation(result: any): { address: string; city?: string; state?: string; postal_code?: string; lat: number; lng: number } {
+        try {
+            // Extract the components from the result
+            const location = {
+                address: result.address.freeformAddress,
+                lat: result.position.lat,
+                lng: result.position.lon
+            } as { 
+                address: string; 
+                city?: string; 
+                state?: string; 
+                postal_code?: string; 
+                lat: number; 
+                lng: number 
+            };
+            
+            // If there are address components in the result, extract them
+            if (result.address) {
+                if (result.address.municipality) {
+                    location.city = result.address.municipality;
+                }
+                
+                if (result.address.countrySubdivision) {
+                    location.state = result.address.countrySubdivision;
+                }
+                
+                if (result.address.postalCode) {
+                    location.postal_code = result.address.postalCode;
+                }
+            }
+            
+            return location;
+        } catch (error) {
+            console.error('Error converting to location:', error);
+            return {
+                address: result.address?.freeformAddress || '',
+                lat: result.position?.lat || 0,
+                lng: result.position?.lon || 0
+            };
         }
-        
-        if (result.address.countrySubdivision) {
-          location.state = result.address.countrySubdivision;
-        }
-        
-        if (result.address.postalCode) {
-          location.postal_code = result.address.postalCode;
-        }
-      }
-      
-      return location;
-    } catch (error) {
-      console.error('Error converting to location:', error);
-      return {
-        address: result.address?.freeformAddress || '',
-        lat: result.position?.lat || 0,
-        lng: result.position?.lon || 0
-      };
     }
-  }
-
 }
 
 // Exporta uma instância singleton do serviço
