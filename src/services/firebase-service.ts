@@ -845,10 +845,9 @@ class FirebaseService {
         }
     }
 
-    // ---------------------------------------------
+// ---------------------------------------------
 // SOCIAL NETWORKING METHODS FOR FIREBASE SERVICE
 // ---------------------------------------------
-// Add these methods to your src/services/firebase-service.ts file
 
 /**
  * Gets all friendships for the current user
@@ -881,17 +880,17 @@ async getFriendships(): Promise<any[]> {
   
       // Process friendships and get user data
       const processSnapshots = async (snapshot: any, isUser1: boolean) => {
-        for (const doc of snapshot.docs) {
-          const data = doc.data();
+        for (const docSnapshot of snapshot.docs) {  // Renomeado de 'doc' para 'docSnapshot'
+          const data = docSnapshot.data();
           const otherUserId = isUser1 ? data.user2_id : data.user1_id;
           
           // Get the other user's data
-          const userDoc = await getDoc(doc(db, `users/${otherUserId}`));
+          const userDoc = await getDoc(doc(db, `users/${otherUserId}`));  // Agora 'doc' se refere à função importada
           if (userDoc.exists()) {
             const userData = userDoc.data() as DocumentData;
             
             friendships.push({
-              id: doc.id,
+              id: docSnapshot.id,  // Referência atualizada
               user_id: otherUserId,
               name: userData.name || '',
               email: userData.email || '',
@@ -905,18 +904,17 @@ async getFriendships(): Promise<any[]> {
           }
         }
       };
-  
-      await Promise.all([
-        processSnapshots(snapshot1, true),
-        processSnapshots(snapshot2, false)
-      ]);
-  
+      
+      // Execute the processing for both queries
+      await processSnapshots(snapshot1, true);
+      await processSnapshots(snapshot2, false);
+      
       return friendships;
     } catch (error) {
       console.error('Error getting friendships:', error);
       throw error;
     }
-  }
+}
   
   /**
    * Searches for users by name or email
